@@ -21,6 +21,9 @@ trades.json
 daily_performance.json
 error.log
 *.log
+*.jsonl
+api_costs.jsonl
+routing_log.jsonl
 
 # ── Caches ────────────────────────────────────────────────
 research_cache.json
