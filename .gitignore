@@ -26,6 +26,12 @@ error.log
 research_cache.json
 bull_run_cache.json
 
+# ── Auto-generierter Verbesserungs-Backlog (Laufzeit-Artefakt) ──
+# Der Mechanismus (improvement_scanner.py, CLAUDE.md) ist versioniert;
+# die generierten Backlog-Dateien nicht (ändern sich bei jedem Scan).
+IMPROVEMENTS.md
+improvements.json
+
 # ── Generierte Charts ─────────────────────────────────────
 charts/
 *.png

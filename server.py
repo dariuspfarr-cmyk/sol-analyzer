@@ -275,6 +275,12 @@ def _run_bot() -> None:
         _sse_broadcast("research_update", research.get("analysis", {}))
     except Exception:
         pass
+    # Verbesserungs-Backlog für Claude Code aktualisieren (schnell, ohne Linter)
+    try:
+        import improvement_scanner
+        improvement_scanner.run(fast=True)
+    except Exception:
+        pass
 
 
 def api_paper() -> dict:
