@@ -84,6 +84,8 @@ DRAWDOWN_LOSS_TRIGGER = 3   # Verluste in Folge → halbes Risiko
 # (15m: 12h · 4h: 7 Tage · 1d: 30 Tage) — siehe _check_close_one
 MIN_SCORE_FLOOR       = 65.0 # Mindest-Composite-Score; schlechtere Signale werden ignoriert
 DAILY_LOSS_LIMIT_PCT  = 0.02 # Tägliches Verlust-Limit 2% → kein neuer Trade bis nächsten Tag
+MAX_CONSECUTIVE_LOSSES = 6   # nach N Verlusten in Folge: Trading-Pause (Circuit-Breaker)
+LOSS_PAUSE_HOURS       = 12  # Dauer der Pause nach Verlustserie
 DEDUP_HOURS           = 2.0  # Setup+Bias-Duplikat-Sperre: kein erneuter Eintritt innerhalb N Stunden
 WIN_STREAK_BONUS_MIN  = 3    # ab N Gewinnen in Folge: Risiko-Bonus
 DD_SCALE_MAX_PCT      = 10.0 # bei 10% Drawdown → 50% der normalen Risikogröße
@@ -570,6 +572,7 @@ class State:
         self.setup_cooldowns:    dict           = {}   # setup_type → last_loss_ts
         self.daily_pnl:          float          = 0.0  # Tages-PnL für Circuit-Breaker
         self.daily_date:         str            = ""   # "YYYY-MM-DD" des aktuellen Tages
+        self.loss_pause_until:   str            = ""   # ISO-TS: Pause nach Verlustserie
         self.started_at:         str            = datetime.now(timezone.utc).isoformat()
 
     @property
@@ -613,6 +616,7 @@ class State:
             "setup_cooldowns":    self.setup_cooldowns,
             "daily_pnl":          self.daily_pnl,
             "daily_date":         self.daily_date,
+            "loss_pause_until":   self.loss_pause_until,
             "win_rate":           round(self.win_rate, 2),
             "profit_factor":      round(self.profit_factor, 3),
             "positions":          self.positions,
@@ -650,6 +654,7 @@ class State:
             self.setup_cooldowns    = dict(data.get("setup_cooldowns",     {}))
             self.daily_pnl          = float(data.get("daily_pnl",         0.0))
             self.daily_date         = str(data.get("daily_date",          ""))
+            self.loss_pause_until   = str(data.get("loss_pause_until",    ""))
             raw = data.get("positions")
             if raw is None:
                 old = data.get("position")
@@ -1677,6 +1682,7 @@ def _finalize_close(state: State, p: dict, exit_price: float, reason: str,
         state.wins               += 1
         state.consecutive_losses  = 0
         state.consecutive_wins   += 1
+        state.loss_pause_until    = ""   # Verlustserie gebrochen → Pause aufheben
         # Reset setup-loss counter on win
         if f"{setup_type}_count" in state.setup_cooldowns:
             state.setup_cooldowns[f"{setup_type}_count"] = 0
@@ -1688,6 +1694,14 @@ def _finalize_close(state: State, p: dict, exit_price: float, reason: str,
         count_key = f"{setup_type}_count"
         state.setup_cooldowns[count_key] = state.setup_cooldowns.get(count_key, 0) + 1
         state.setup_cooldowns[setup_type] = time.time()  # timestamp of last loss
+        # Circuit-Breaker: nach N Verlusten in Folge Trading pausieren
+        if state.consecutive_losses >= MAX_CONSECUTIVE_LOSSES:
+            from datetime import timedelta as _td
+            until = datetime.now(timezone.utc) + _td(hours=LOSS_PAUSE_HOURS)
+            state.loss_pause_until = until.isoformat()
+            print(f"  🛑 CIRCUIT-BREAKER: {state.consecutive_losses} Verluste in Folge "
+                  f"→ Trading-Pause bis {until.strftime('%d.%m %H:%M')} UTC "
+                  f"({LOSS_PAUSE_HOURS}h). Schützt vor Regime-Fehlanpassung.")
 
     closed_at = datetime.now(timezone.utc).isoformat()
 
@@ -1741,7 +1755,9 @@ def _finalize_close(state: State, p: dict, exit_price: float, reason: str,
         except Exception as e:
             _log_error(f"update_signal_outcome: {e}")
     else:
-        _log_error("Kein signal_id in Position — Outcome kann nicht zurückgeschrieben werden")
+        # Erwarteter Randfall (z. B. Position ohne DB-Signal) — kein echter Fehler,
+        # daher nur stiller Hinweis statt error.log-Eintrag.
+        print("  [info] Position ohne signal_id — Outcome-Rückschreibung übersprungen")
 
     # ── 2. Learning Engine: kurzfristige Gewicht-Anpassung ────────────────────
     learning_engine.update_weights(
@@ -1975,12 +1991,26 @@ def run_once(state: State) -> None:
     _check_close(state, df)
 
     if len(state.positions) < MAX_POSITIONS:
-        # Tages-Verlust-Limit: kein neuer Trade wenn -2% heute erreicht
         today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-        if state.daily_date == today and state.daily_pnl <= -(state.balance * DAILY_LOSS_LIMIT_PCT):
+        # Circuit-Breaker 1: Pause nach Verlustserie (N Verluste in Folge)
+        paused = False
+        if state.loss_pause_until:
+            try:
+                if datetime.now(timezone.utc) < datetime.fromisoformat(state.loss_pause_until):
+                    paused = True
+                    print(f"  🛑 [Circuit Breaker] Verlustserie-Pause aktiv bis "
+                          f"{state.loss_pause_until[:16]} — kein neuer Trade")
+                else:
+                    state.loss_pause_until = ""   # Pause abgelaufen
+            except Exception:
+                state.loss_pause_until = ""
+        # Circuit-Breaker 2: Tages-Verlust-Limit (-2%)
+        if not paused and state.daily_date == today and \
+           state.daily_pnl <= -(state.balance * DAILY_LOSS_LIMIT_PCT):
+            paused = True
             print(f"  [Circuit Breaker] Tages-Verlust ${state.daily_pnl:.2f} ≤ "
                   f"-{DAILY_LOSS_LIMIT_PCT*100:.0f}% — kein neuer Trade heute")
-        else:
+        if not paused:
             sig_row = _get_db_signal(state)
             if sig_row:
                 _open_trade_from_signal(state, sig_row)

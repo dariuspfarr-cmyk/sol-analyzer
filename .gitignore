@@ -28,6 +28,8 @@ routing_log.jsonl
 # ── Caches ────────────────────────────────────────────────
 research_cache.json
 bull_run_cache.json
+poi_log.json
+poi_stats.json
 
 # ── Auto-generierter Verbesserungs-Backlog (Laufzeit-Artefakt) ──
 # Der Mechanismus (improvement_scanner.py, CLAUDE.md) ist versioniert;
