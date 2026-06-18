@@ -1,0 +1,27 @@
+{
+  "erstellt_am": "2026-06-18T13:36:25.669831+00:00",
+  "accuracy": 0.7766,
+  "accuracy_pct": 77.66,
+  "trainings_samples": 385,
+  "wins_in_training": 258,
+  "losses_in_training": 127,
+  "cv_scores": [
+    0.8182,
+    0.7922,
+    0.7273,
+    0.7273,
+    0.8182
+  ],
+  "feature_importance": {
+    "setup_type_enc": 0.1083,
+    "timeframe_enc": 0.2033,
+    "bias_enc": 0.129,
+    "confidence_enc": 0.0762,
+    "confidence_score": 0.0707,
+    "volume_ratio": 0.0634,
+    "zone_position_enc": 0.1983,
+    "time_of_day": 0.0626,
+    "day_of_week": 0.0883
+  },
+  "ersetzt_haiku": true
+}

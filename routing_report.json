@@ -1,0 +1,19 @@
+{
+  "erstellt_am": "2026-06-08T07:18:33.409812+00:00",
+  "zeitraum_tage": 7,
+  "gesamt_signale": 32,
+  "algo_signale": 0,
+  "ai_signale": 17,
+  "uebersprungen": 15,
+  "algo_quote_pct": 0.0,
+  "ai_kosten_usd": 0.02142,
+  "gespartes_usd": 0.0,
+  "nach_setup": {
+    "Zone": {
+      "skip": 15
+    },
+    "BOS": {
+      "ai": 17
+    }
+  }
+}

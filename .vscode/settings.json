@@ -1,0 +1,32 @@
+{
+  "// Python": "venv-Interpreter automatisch nutzen",
+  "python.defaultInterpreterPath": "${workspaceFolder}\\.venv\\Scripts\\python.exe",
+
+  "// ESLint": "auch in HTML-Dateien linten (eingebettetes <script>-JS)",
+  "eslint.validate": ["javascript", "html"],
+  "eslint.run": "onType",
+  "eslint.useFlatConfig": true,
+
+  "// Ruff": "als Formatter/Linter fuer Python, falls installiert",
+  "[python]": {
+    "editor.defaultFormatter": "charliermarsh.ruff",
+    "editor.formatOnSave": false
+  },
+
+  "// Allgemein": "Rauschen ausblenden",
+  "files.exclude": {
+    "**/__pycache__": true,
+    "**/*.pyc": true,
+    "**/.ruff_cache": true,
+    "**/.mypy_cache": true
+  },
+  "files.watcherExclude": {
+    "**/.venv/**": true,
+    "**/node_modules/**": true
+  },
+  "search.exclude": {
+    "**/.venv": true,
+    "**/node_modules": true,
+    "**/charts": true
+  }
+}

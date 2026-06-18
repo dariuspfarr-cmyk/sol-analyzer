@@ -1,0 +1,1180 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SOL Trendlinien Strategie – 4H Chart</title>
+<style>
+  :root {
+    --bg: #0d1117;
+    --surface: #161b22;
+    --surface2: #1c2330;
+    --border: #30363d;
+    --text: #e6edf3;
+    --muted: #8b949e;
+    --green: #3fb950;
+    --red: #f85149;
+    --blue: #58a6ff;
+    --orange: #ff7b72;
+    --yellow: #e3b341;
+    --purple: #bc8cff;
+    --cyan: #79c0ff;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    font-size: 14px;
+    line-height: 1.5;
+  }
+  header {
+    background: linear-gradient(135deg, #1a2332 0%, #0d1117 100%);
+    border-bottom: 1px solid var(--border);
+    padding: 20px 32px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+  header .logo {
+    width: 42px; height: 42px;
+    background: linear-gradient(135deg, var(--purple), var(--blue));
+    border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 20px; font-weight: 700; color: #fff;
+  }
+  header h1 { font-size: 20px; font-weight: 600; }
+  header span { color: var(--muted); font-size: 13px; }
+
+  .tabs {
+    display: flex;
+    gap: 4px;
+    padding: 12px 32px 0;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface);
+    overflow-x: auto;
+  }
+  .tab {
+    padding: 8px 16px;
+    border-radius: 6px 6px 0 0;
+    cursor: pointer;
+    color: var(--muted);
+    font-size: 13px;
+    font-weight: 500;
+    border: 1px solid transparent;
+    border-bottom: none;
+    transition: all .2s;
+    white-space: nowrap;
+  }
+  .tab:hover { color: var(--text); background: var(--surface2); }
+  .tab.active {
+    color: var(--text);
+    background: var(--bg);
+    border-color: var(--border);
+  }
+
+  .page { display: none; padding: 24px 32px; }
+  .page.active { display: block; }
+
+  h2 { font-size: 16px; font-weight: 600; margin-bottom: 16px; color: var(--cyan); }
+  h3 { font-size: 14px; font-weight: 600; margin-bottom: 10px; color: var(--text); }
+
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+  .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; }
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 18px;
+  }
+
+  canvas { display: block; width: 100%; border-radius: 6px; }
+
+  .badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: .5px;
+  }
+  .badge-green { background: rgba(63,185,80,.15); color: var(--green); }
+  .badge-red   { background: rgba(248,81,73,.15);  color: var(--red); }
+  .badge-blue  { background: rgba(88,166,255,.15); color: var(--blue); }
+  .badge-yellow{ background: rgba(227,179,65,.15); color: var(--yellow); }
+
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th { text-align: left; padding: 8px 12px; color: var(--muted); font-weight: 500; border-bottom: 1px solid var(--border); }
+  td { padding: 8px 12px; border-bottom: 1px solid rgba(48,54,61,.5); }
+  tr:last-child td { border-bottom: none; }
+
+  .rule-row { display: flex; align-items: flex-start; gap: 10px; padding: 8px 0; border-bottom: 1px solid rgba(48,54,61,.4); }
+  .rule-row:last-child { border-bottom: none; }
+  .rule-icon { font-size: 16px; margin-top: 1px; flex-shrink: 0; }
+
+  .tree-wrap { display: flex; justify-content: center; padding: 8px 0; overflow-x: auto; }
+
+  .formula {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--purple);
+    border-radius: 6px;
+    padding: 12px 16px;
+    font-family: 'Courier New', monospace;
+    font-size: 13px;
+    color: var(--cyan);
+    margin: 12px 0;
+  }
+
+  .indicator-list { display: flex; flex-direction: column; gap: 8px; }
+  .indicator-row {
+    display: flex; align-items: center; gap: 12px;
+    background: var(--surface2);
+    border-radius: 6px;
+    padding: 10px 14px;
+  }
+  .indicator-dot { width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0; }
+
+  .entry-block {
+    border-left: 3px solid;
+    padding: 10px 14px;
+    border-radius: 0 6px 6px 0;
+    background: var(--surface2);
+    margin: 8px 0;
+    font-size: 13px;
+  }
+  .entry-block.green { border-color: var(--green); }
+  .entry-block.red   { border-color: var(--red); }
+  .entry-block.blue  { border-color: var(--blue); }
+  .entry-block.yellow{ border-color: var(--yellow); }
+
+  @media(max-width:900px){
+    .grid-2,.grid-3 { grid-template-columns: 1fr; }
+    .page { padding: 16px; }
+    .tabs { padding: 10px 16px 0; }
+    header { padding: 14px 16px; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">◎</div>
+  <div>
+    <h1>SOL Trendlinien Strategie</h1>
+    <span>Solana · 4H Chart · Technische Analyse</span>
+  </div>
+  <a href="sol-backtester.html" style="margin-left:auto;color:var(--blue);text-decoration:none;font-size:12px;padding:5px 12px;border:1px solid var(--border);border-radius:6px;">📊 Backtester →</a>
+</header>
+
+<div class="tabs">
+  <div class="tab active" onclick="showTab('overview')">Übersicht</div>
+  <div class="tab" onclick="showTab('stratA')">Strategie A – Bounce</div>
+  <div class="tab" onclick="showTab('stratB')">Strategie B – Breakout</div>
+  <div class="tab" onclick="showTab('stratC')">Strategie C – Wedge</div>
+  <div class="tab" onclick="showTab('indicators')">Indikatoren</div>
+  <div class="tab" onclick="showTab('risk')">Risiko & MM</div>
+  <div class="tab" onclick="showTab('tree')">Entscheidungsbaum</div>
+</div>
+
+<!-- ─── ÜBERSICHT ─── -->
+<div class="page active" id="overview">
+  <h2>Strategie-Übersicht</h2>
+  <div class="grid-3" style="margin-bottom:20px">
+    <div class="card" style="cursor:pointer;border-color:#3fb95040" onclick="showTab('stratA')">
+      <div style="font-size:24px;margin-bottom:8px">↗</div>
+      <h3 style="color:var(--green)">Strategie A · Bounce</h3>
+      <p style="color:var(--muted);font-size:12px;margin-bottom:10px">Trend-Continuation an steigender Trendlinie</p>
+      <span class="badge badge-green">Long Setup</span>
+    </div>
+    <div class="card" style="cursor:pointer;border-color:#58a6ff40" onclick="showTab('stratB')">
+      <div style="font-size:24px;margin-bottom:8px">⚡</div>
+      <h3 style="color:var(--blue)">Strategie B · Breakout</h3>
+      <p style="color:var(--muted);font-size:12px;margin-bottom:10px">Trendlinien-Bruch mit Momentum & Retest</p>
+      <span class="badge badge-blue">Long / Short</span>
+    </div>
+    <div class="card" style="cursor:pointer;border-color:#bc8cff40" onclick="showTab('stratC')">
+      <div style="font-size:24px;margin-bottom:8px">◇</div>
+      <h3 style="color:var(--purple)">Strategie C · Wedge</h3>
+      <p style="color:var(--muted);font-size:12px;margin-bottom:10px">Rising / Falling Wedge Pattern</p>
+      <span class="badge" style="background:rgba(188,140,255,.15);color:var(--purple)">Reversal</span>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>Haupt-Chart – Trendlinien-Konzept</h3>
+    <canvas id="overviewChart" height="320"></canvas>
+  </div>
+
+  <div style="margin-top:16px" class="grid-2">
+    <div class="card">
+      <h3>Valide Trendlinie – Regeln</h3>
+      <div class="rule-row"><span class="rule-icon">✅</span><div>Mindestens <strong>2–3 Berührungspunkte</strong> (mehr = stärker)</div></div>
+      <div class="rule-row"><span class="rule-icon">✅</span><div>Kerzen dürfen <strong>wick-en</strong>, aber nicht mit dem <strong>Body darunter schließen</strong></div></div>
+      <div class="rule-row"><span class="rule-icon">✅</span><div>Winkel <strong>20°–45°</strong> ideal (zu steil = instabil)</div></div>
+      <div class="rule-row"><span class="rule-icon">✅</span><div>Zeichne an <strong>Kerzenwicks</strong>, nicht an Schlusskursen</div></div>
+      <div class="rule-row"><span class="rule-icon">❌</span><div>Trendlinie erst nach <strong>2 validen Punkten</strong> einzeichnen</div></div>
+      <div class="rule-row"><span class="rule-icon">❌</span><div>Nie gegen den <strong>1D-Trend</strong> traden</div></div>
+    </div>
+    <div class="card">
+      <h3>Schnell-Referenz: Einstiegs-Filter</h3>
+      <table>
+        <tr><th>Kriterium</th><th>Bedingung</th></tr>
+        <tr><td>Trendlinie</td><td>≥ 2 Berührungen</td></tr>
+        <tr><td>Kerzenformation</td><td>Engulfing / Hammer / Pin Bar</td></tr>
+        <tr><td>RSI (14)</td><td>35–45 oder bull. Divergenz</td></tr>
+        <tr><td>Volumen</td><td>↓ Pullback → ↑ Bounce</td></tr>
+        <tr><td>Daily Trend</td><td>SOL über 200 EMA (1D)</td></tr>
+        <tr><td>Risk/Reward</td><td>Min. 1:2, ideal 1:3</td></tr>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ─── STRATEGIE A ─── -->
+<div class="page" id="stratA">
+  <h2>Strategie A – Bounce an der Trendlinie</h2>
+  <div class="grid-2">
+    <div class="card">
+      <h3>Chart-Illustration</h3>
+      <canvas id="stratAChart" height="300"></canvas>
+    </div>
+    <div class="card">
+      <h3>Setup-Kriterien <span class="badge badge-green" style="margin-left:8px">Alle erfüllt</span></h3>
+      <table>
+        <tr><th>Kriterium</th><th>Bedingung</th></tr>
+        <tr><td>Trendlinie</td><td>≥ 2 bestätigte Berührungen</td></tr>
+        <tr><td>Kerzenformation</td><td>Bull. Engulfing / Hammer / Pin Bar</td></tr>
+        <tr><td>RSI (14)</td><td>35–45 überverkauft · bull. Divergenz</td></tr>
+        <tr><td>Volumen</td><td>↓ Pullback → ↑ Bounce-Kerze</td></tr>
+        <tr><td>Higher TF</td><td>Daily Trend bullisch (über 200 EMA)</td></tr>
+      </table>
+
+      <div style="margin-top:14px">
+        <div class="entry-block green">
+          <strong>Einstieg Aggressiv</strong><br>
+          Bei TL-Berührung + bullischer 4H-Kerze → Market Order am Close
+        </div>
+        <div class="entry-block blue">
+          <strong>Einstieg Konservativ</strong><br>
+          Warte auf Re-Test des nächsten Supports nach Bounce → Limit Order
+        </div>
+        <div class="entry-block red">
+          <strong>Stop-Loss</strong><br>
+          5–8% unter TL · oder unter letztes signifikantes Higher Low
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card" style="margin-top:16px">
+    <h3>Take-Profit Zonen</h3>
+    <div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:8px">
+      <div style="flex:1;min-width:180px;background:var(--surface2);border-radius:8px;padding:14px;border-left:3px solid var(--green)">
+        <div style="font-size:11px;color:var(--muted);margin-bottom:4px">TP1 – 50% der Position</div>
+        <div style="font-weight:600;color:var(--green)">Letztes Swing High</div>
+        <div style="font-size:12px;color:var(--muted);margin-top:4px">Sofortige Teilgewinnmitnahme</div>
+      </div>
+      <div style="flex:1;min-width:180px;background:var(--surface2);border-radius:8px;padding:14px;border-left:3px solid var(--yellow)">
+        <div style="font-size:11px;color:var(--muted);margin-bottom:4px">TP2 – 30% der Position</div>
+        <div style="font-weight:600;color:var(--yellow)">Fib 1.272 Extension</div>
+        <div style="font-size:12px;color:var(--muted);margin-top:4px">Nächster Widerstand</div>
+      </div>
+      <div style="flex:1;min-width:180px;background:var(--surface2);border-radius:8px;padding:14px;border-left:3px solid var(--purple)">
+        <div style="font-size:11px;color:var(--muted);margin-bottom:4px">TP3 – 20% der Position</div>
+        <div style="font-weight:600;color:var(--purple)">Trailing Stop 8%</div>
+        <div style="font-size:12px;color:var(--muted);margin-top:4px">Für maximale Gewinne im Trend</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ─── STRATEGIE B ─── -->
+<div class="page" id="stratB">
+  <h2>Strategie B – Trendlinien-Bruch (Breakout)</h2>
+  <div class="grid-2">
+    <div class="card">
+      <h3>Chart-Illustration</h3>
+      <canvas id="stratBChart" height="300"></canvas>
+    </div>
+    <div class="card">
+      <h3>Bedingungen für validen Bruch</h3>
+      <div class="rule-row"><span class="rule-icon" style="color:var(--blue)">①</span><div>4H Kerzenschluss <strong>klar über/unter</strong> der TL (kein Fake-Break)</div></div>
+      <div class="rule-row"><span class="rule-icon" style="color:var(--blue)">②</span><div>Volumen beim Bruch <strong>deutlich über</strong> dem 20-Perioden-Ø</div></div>
+      <div class="rule-row"><span class="rule-icon" style="color:var(--blue)">③</span><div>RSI <strong>&gt; 55</strong> beim bullischen Bruch · <strong>&lt; 45</strong> beim bärischen</div></div>
+      <div class="rule-row"><span class="rule-icon" style="color:var(--yellow)">④</span><div><strong>Re-Test</strong>: SOL läuft zurück zur TL (jetzt Support) → Einstieg beim Re-Test</div></div>
+
+      <div style="margin-top:14px">
+        <div class="entry-block blue">
+          <strong>Einstieg (Breakout Long)</strong><br>
+          Beim Re-Test der gebrochenen TL als neuer Support<br>
+          + bullische Kerze + erhöhtes Volumen
+        </div>
+        <div class="entry-block red">
+          <strong>Stop-Loss</strong><br>
+          Unter die gebrochene Trendlinie<br>
+          Trade ungültig wenn Kurs darunter schließt
+        </div>
+        <div class="entry-block yellow">
+          <strong>Take-Profit – Measured Move</strong><br>
+          Höhe der Konsolidierung messen → nach oben projizieren
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card" style="margin-top:16px">
+    <h3>Fake-Break vs. Valider Bruch</h3>
+    <canvas id="fakeBreakChart" height="180"></canvas>
+  </div>
+</div>
+
+<!-- ─── STRATEGIE C ─── -->
+<div class="page" id="stratC">
+  <h2>Strategie C – Keil / Wedge Pattern</h2>
+  <div class="grid-2">
+    <div class="card">
+      <h3>Rising Wedge <span class="badge badge-red" style="margin-left:8px">Bärisch</span></h3>
+      <canvas id="wedgeRisingChart" height="260"></canvas>
+      <div style="margin-top:10px">
+        <div class="entry-block red">
+          <strong>Signal:</strong> Bruch der unteren Keil-Linie → Short<br>
+          <strong>Bestätigung:</strong> Volumen beim Bruch erhöht
+        </div>
+      </div>
+    </div>
+    <div class="card">
+      <h3>Falling Wedge <span class="badge badge-green" style="margin-left:8px">Bullisch</span></h3>
+      <canvas id="wedgeFallingChart" height="260"></canvas>
+      <div style="margin-top:10px">
+        <div class="entry-block green">
+          <strong>Signal:</strong> Bruch der oberen Keil-Linie → Long<br>
+          <strong>Bestätigung:</strong> Volumen beim Bruch erhöht
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card" style="margin-top:16px">
+    <h3>Wedge Checkliste</h3>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+      <div>
+        <div class="rule-row"><span class="rule-icon">✅</span><div>Beide Keil-Linien klar eingezeichnet</div></div>
+        <div class="rule-row"><span class="rule-icon">✅</span><div>Konvergierende Linien (Zuspitzung)</div></div>
+        <div class="rule-row"><span class="rule-icon">✅</span><div>Mindestens 4 Berührungspunkte (2 pro Linie)</div></div>
+      </div>
+      <div>
+        <div class="rule-row"><span class="rule-icon">✅</span><div>Einstieg immer mit Volumenbestätigung</div></div>
+        <div class="rule-row"><span class="rule-icon">✅</span><div>Kerzenschluss außerhalb des Keils abwarten</div></div>
+        <div class="rule-row"><span class="rule-icon">❌</span><div>Kein Einstieg ohne 4H-Kerzenschluss</div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ─── INDIKATOREN ─── -->
+<div class="page" id="indicators">
+  <h2>Indikator-Setup für den 4H Chart</h2>
+  <div class="grid-2">
+    <div class="card">
+      <h3>Pflicht-Indikatoren</h3>
+      <div class="indicator-list">
+        <div class="indicator-row">
+          <div class="indicator-dot" style="background:#ff9500"></div>
+          <div style="flex:1"><strong>EMA 21</strong> <span style="color:var(--muted);font-size:12px">– Kurzfristiger Trend</span></div>
+          <span class="badge badge-yellow">Pflicht</span>
+        </div>
+        <div class="indicator-row">
+          <div class="indicator-dot" style="background:#58a6ff"></div>
+          <div style="flex:1"><strong>EMA 55</strong> <span style="color:var(--muted);font-size:12px">– Mittelfristiger Trend</span></div>
+          <span class="badge badge-yellow">Pflicht</span>
+        </div>
+        <div class="indicator-row">
+          <div class="indicator-dot" style="background:#f85149"></div>
+          <div style="flex:1"><strong>EMA 200</strong> <span style="color:var(--muted);font-size:12px">– Haupttrend-Filter</span></div>
+          <span class="badge badge-yellow">Pflicht</span>
+        </div>
+        <div class="indicator-row">
+          <div class="indicator-dot" style="background:#3fb950"></div>
+          <div style="flex:1"><strong>RSI (14)</strong> <span style="color:var(--muted);font-size:12px">– Momentum & Divergenzen</span></div>
+          <span class="badge badge-yellow">Pflicht</span>
+        </div>
+        <div class="indicator-row">
+          <div class="indicator-dot" style="background:#bc8cff"></div>
+          <div style="flex:1"><strong>Volumen + Vol. MA 20</strong> <span style="color:var(--muted);font-size:12px">– Bestätigung</span></div>
+          <span class="badge badge-yellow">Pflicht</span>
+        </div>
+      </div>
+
+      <h3 style="margin-top:18px">Optionale Ergänzungen</h3>
+      <div class="indicator-list">
+        <div class="indicator-row" style="opacity:.75">
+          <div class="indicator-dot" style="background:#79c0ff"></div>
+          <div style="flex:1"><strong>MACD (12,26,9)</strong> <span style="color:var(--muted);font-size:12px">– Trendstärke & Divergenz</span></div>
+          <span class="badge badge-blue">Optional</span>
+        </div>
+        <div class="indicator-row" style="opacity:.75">
+          <div class="indicator-dot" style="background:#e3b341"></div>
+          <div style="flex:1"><strong>ATR (14)</strong> <span style="color:var(--muted);font-size:12px">– Stop-Loss Größe berechnen</span></div>
+          <span class="badge badge-blue">Optional</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>Indikator Chart-Beispiel</h3>
+      <canvas id="indicatorChart" height="300"></canvas>
+    </div>
+  </div>
+
+  <div class="card" style="margin-top:16px">
+    <h3>RSI-Zonen im Überblick</h3>
+    <canvas id="rsiChart" height="120"></canvas>
+    <div style="display:flex;gap:16px;flex-wrap:wrap;margin-top:12px;font-size:12px">
+      <div style="display:flex;align-items:center;gap:6px"><div style="width:12px;height:12px;background:#f85149;border-radius:2px"></div>Überkauft (&gt; 70) – Reversal Risiko</div>
+      <div style="display:flex;align-items:center;gap:6px"><div style="width:12px;height:12px;background:#3fb950;border-radius:2px"></div>Überverkauft (&lt; 30) – Bounce Zone</div>
+      <div style="display:flex;align-items:center;gap:6px"><div style="width:12px;height:12px;background:#e3b341;border-radius:2px"></div>Strategie A Sweet Spot (35–45)</div>
+      <div style="display:flex;align-items:center;gap:6px"><div style="width:12px;height:12px;background:#58a6ff;border-radius:2px"></div>Breakout Bestätigung (&gt; 55)</div>
+    </div>
+  </div>
+</div>
+
+<!-- ─── RISIKO & MM ─── -->
+<div class="page" id="risk">
+  <h2>Risiko- & Moneymanagement</h2>
+  <div class="grid-3">
+    <div class="card" style="text-align:center;border-color:rgba(248,81,73,.3)">
+      <div style="font-size:32px;font-weight:700;color:var(--red)">1–2%</div>
+      <div style="color:var(--muted);font-size:13px;margin-top:4px">Max. Risiko pro Trade</div>
+    </div>
+    <div class="card" style="text-align:center;border-color:rgba(88,166,255,.3)">
+      <div style="font-size:32px;font-weight:700;color:var(--blue)">1:3</div>
+      <div style="color:var(--muted);font-size:13px;margin-top:4px">Risk/Reward Ziel (min. 1:2)</div>
+    </div>
+    <div class="card" style="text-align:center;border-color:rgba(227,179,65,.3)">
+      <div style="font-size:32px;font-weight:700;color:var(--yellow)">3–5x</div>
+      <div style="color:var(--muted);font-size:13px;margin-top:4px">Max. Hebelwirkung</div>
+    </div>
+  </div>
+
+  <div class="grid-2" style="margin-top:16px">
+    <div class="card">
+      <h3>Positionsgröße berechnen</h3>
+      <div class="formula">
+Positionsgröße =<br>
+  (Kapital × Risiko%) ÷ (Einstieg − Stop-Loss)
+      </div>
+      <div style="background:var(--surface2);border-radius:8px;padding:14px;font-size:13px;margin-top:8px">
+        <strong style="color:var(--cyan)">Beispiel:</strong><br>
+        Kapital: 10.000 $<br>
+        Risiko: 1% = 100 $<br>
+        Einstieg: 150 $ · Stop-Loss: 141 $ (–6%)<br>
+        <br>
+        Pos.-Größe = 100 ÷ 9 = <strong style="color:var(--green)">~11,1 SOL</strong>
+      </div>
+      <div class="card" style="margin-top:12px">
+        <canvas id="posCalcChart" height="150"></canvas>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>Parameter-Tabelle</h3>
+      <table>
+        <tr><th>Parameter</th><th>Regel</th></tr>
+        <tr><td>Max. Risiko/Trade</td><td><span class="badge badge-red">1–2% Kapital</span></td></tr>
+        <tr><td>Risk/Reward</td><td><span class="badge badge-green">Min. 1:2 · Ideal 1:3</span></td></tr>
+        <tr><td>Max. offene Trades</td><td><span class="badge badge-blue">2–3 gleichzeitig</span></td></tr>
+        <tr><td>Hebelwirkung</td><td><span class="badge badge-yellow">Max. 3–5x</span></td></tr>
+        <tr><td>Wochenverlust-Limit</td><td><span class="badge badge-red">–6% → Pause</span></td></tr>
+        <tr><td>Stop-Loss SOL</td><td>5–8% (ATR-basiert)</td></tr>
+        <tr><td>TP1 / TP2 / TP3</td><td>50% · 30% · 20%</td></tr>
+      </table>
+
+      <h3 style="margin-top:16px">Typische Fehler</h3>
+      <div class="rule-row"><span class="rule-icon">❌</span><div>TL zu früh zeichnen (unter 2 Punkten)</div></div>
+      <div class="rule-row"><span class="rule-icon">❌</span><div>Fake-Breaks ignorieren – immer 4H-Schlusskurs abwarten</div></div>
+      <div class="rule-row"><span class="rule-icon">❌</span><div>Stop zu eng – SOL ATR ist 3–6% im 4H</div></div>
+      <div class="rule-row"><span class="rule-icon">❌</span><div>News-Events ignorieren (FED, Solana Konferenzen)</div></div>
+    </div>
+  </div>
+
+  <div class="card" style="margin-top:16px">
+    <h3>Tagesablauf / Routine</h3>
+    <div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:8px">
+      <div style="flex:1;min-width:160px;background:var(--surface2);border-radius:8px;padding:14px;text-align:center">
+        <div style="font-size:20px;font-weight:700;color:var(--cyan)">08:00</div>
+        <div style="font-size:12px;color:var(--muted);margin-top:4px">Daily Chart analysieren<br>Trend · S/R Level</div>
+      </div>
+      <div style="flex:1;min-width:160px;background:var(--surface2);border-radius:8px;padding:14px;text-align:center">
+        <div style="font-size:20px;font-weight:700;color:var(--blue)">08:15</div>
+        <div style="font-size:12px;color:var(--muted);margin-top:4px">4H Chart Trendlinien<br>aktualisieren · Setups scannen</div>
+      </div>
+      <div style="flex:1;min-width:160px;background:var(--surface2);border-radius:8px;padding:14px;text-align:center">
+        <div style="font-size:20px;font-weight:700;color:var(--purple)">Alle 4H</div>
+        <div style="font-size:12px;color:var(--muted);margin-top:4px">Neue Kerze → Setup-Check<br>Indikatoren prüfen</div>
+      </div>
+      <div style="flex:1;min-width:160px;background:var(--surface2);border-radius:8px;padding:14px;text-align:center">
+        <div style="font-size:20px;font-weight:700;color:var(--yellow)">20:00</div>
+        <div style="font-size:12px;color:var(--muted);margin-top:4px">Offene Trades reviewen<br>Trailing Stops anpassen</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ─── ENTSCHEIDUNGSBAUM ─── -->
+<div class="page" id="tree">
+  <h2>Entscheidungsbaum – SOL 4H Setup-Check</h2>
+  <div class="card">
+    <canvas id="treeChart" height="500"></canvas>
+  </div>
+  <div class="card" style="margin-top:16px">
+    <h3>Zusammenfassung – Strategieauswahl</h3>
+    <table>
+      <tr><th>Situation</th><th>Strategie</th><th>Typ</th></tr>
+      <tr><td>Kurs berührt steigende TL im Auftrend</td><td>A – Bounce</td><td><span class="badge badge-green">Long</span></td></tr>
+      <tr><td>TL wird mit Momentum & Volumen gebrochen</td><td>B – Breakout</td><td><span class="badge badge-blue">Long / Short</span></td></tr>
+      <tr><td>Keil konvergiert und bricht</td><td>C – Wedge</td><td><span class="badge" style="background:rgba(188,140,255,.15);color:var(--purple)">Reversal</span></td></tr>
+      <tr><td>Keine TL vorhanden / Daily bärisch</td><td>Kein Trade</td><td><span class="badge badge-red">Warten</span></td></tr>
+    </table>
+  </div>
+</div>
+
+<script>
+// ─── Utilities ───────────────────────────────────────────────────────────────
+const C = id => document.getElementById(id);
+const CTX = id => { const c = C(id); c.width = c.parentElement.clientWidth; return c.getContext('2d'); };
+
+function showTab(id){
+  document.querySelectorAll('.tab').forEach((t,i)=>{
+    t.classList.toggle('active', ['overview','stratA','stratB','stratC','indicators','risk','tree'][i]===id);
+  });
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  C(id).classList.add('active');
+  setTimeout(drawAll, 50);
+}
+
+// Candle helpers
+function drawCandle(ctx, x, open, close, high, low, w=8){
+  const bullish = close >= open;
+  ctx.strokeStyle = bullish ? '#3fb950' : '#f85149';
+  ctx.fillStyle   = bullish ? '#3fb950' : '#f85149';
+  ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.moveTo(x, high); ctx.lineTo(x, low); ctx.stroke();
+  const y = Math.min(open, close);
+  const h = Math.max(Math.abs(close-open), 2);
+  ctx.fillRect(x-w/2, y, w, h);
+}
+
+function drawLine(ctx, x1,y1,x2,y2,color='#58a6ff',dash=[],w=1.5){
+  ctx.save();
+  ctx.strokeStyle=color; ctx.lineWidth=w;
+  if(dash.length) ctx.setLineDash(dash);
+  ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.stroke();
+  ctx.restore();
+}
+
+function label(ctx, x, y, text, color='#8b949e', size=11, align='left'){
+  ctx.fillStyle=color; ctx.font=`${size}px Segoe UI,system-ui,sans-serif`;
+  ctx.textAlign=align; ctx.fillText(text,x,y);
+}
+
+// ─── Overview Chart ───────────────────────────────────────────────────────────
+function drawOverview(){
+  const ctx = CTX('overviewChart');
+  const W = ctx.canvas.width, H = ctx.canvas.height;
+  ctx.fillStyle='#161b22'; ctx.fillRect(0,0,W,H);
+
+  // Generate uptrend candles
+  const candles=[];
+  let price=100;
+  for(let i=0;i<36;i++){
+    const rng=Math.sin(i*0.8)*4 + (i*1.8);
+    const open=price + (Math.random()-0.5)*3;
+    const close=open + (Math.random()-0.3)*5 + 0.8;
+    const high=Math.max(open,close)+(Math.random()*3);
+    const low=Math.min(open,close)-(Math.random()*3);
+    candles.push({open,close,high,low});
+    price=close;
+  }
+
+  const priceMin=Math.min(...candles.map(c=>c.low))-5;
+  const priceMax=Math.max(...candles.map(c=>c.high))+10;
+  const pad={l:20,r:30,t:20,b:30};
+  const cw=(W-pad.l-pad.r)/candles.length;
+
+  const toY=p=> pad.t + (priceMax-p)/(priceMax-priceMin)*(H-pad.t-pad.b);
+  const toX=i=> pad.l + i*cw + cw/2;
+
+  // EMA 200 (flat at bottom)
+  ctx.strokeStyle='#f8514960'; ctx.lineWidth=2; ctx.setLineDash([]);
+  ctx.beginPath();
+  candles.forEach((c,i)=>{ const y=toY(85); i===0?ctx.moveTo(toX(i),y):ctx.lineTo(toX(i),y); });
+  ctx.stroke();
+
+  // EMA 21 & 55
+  [21,55].forEach((p,idx)=>{
+    const color = idx===0?'#ff950090':'#58a6ff60';
+    ctx.strokeStyle=color; ctx.lineWidth=1.5;
+    ctx.beginPath();
+    candles.forEach((c,i)=>{ const y=toY(c.close*(idx===0?.95:.92)); i===0?ctx.moveTo(toX(i),y):ctx.lineTo(toX(i),y); });
+    ctx.stroke();
+  });
+
+  // Trendline
+  const tlStart={i:3,p:candles[3].low};
+  const tlEnd={i:35,p:candles[35].low+2};
+  const tlY1=toY(tlStart.p), tlY2=toY(tlEnd.p);
+  drawLine(ctx,toX(tlStart.i),tlY1,toX(tlEnd.i),tlY2,'#58a6ff',[],2);
+
+  // Touch circles
+  [3,12,22,33].forEach(i=>{
+    ctx.beginPath();
+    ctx.arc(toX(i),toY(candles[i].low),6,0,Math.PI*2);
+    ctx.strokeStyle='#58a6ff'; ctx.lineWidth=2; ctx.stroke();
+  });
+
+  // Candles
+  candles.forEach((c,i)=>{
+    drawCandle(ctx, toX(i), toY(c.open), toY(c.close), toY(c.high), toY(c.low), cw*0.6);
+  });
+
+  // Labels
+  label(ctx,toX(4),toY(candles[3].low)-14,'HL1','#58a6ff',10,'center');
+  label(ctx,toX(13),toY(candles[12].low)-14,'HL2','#58a6ff',10,'center');
+  label(ctx,toX(23),toY(candles[22].low)-14,'HL3','#58a6ff',10,'center');
+  label(ctx,W-28,toY(tlEnd.p)+4,'TL →','#58a6ff',11,'right');
+  label(ctx,W-5,toY(85)+4,'EMA 200','#f85149',10,'right');
+  label(ctx,W-5,toY(candles[35].close*.95)+4,'EMA 21','#ff9500',10,'right');
+}
+
+// ─── Strategy A Chart ────────────────────────────────────────────────────────
+function drawStratA(){
+  const ctx = CTX('stratAChart');
+  const W=ctx.canvas.width, H=ctx.canvas.height;
+  ctx.fillStyle='#161b22'; ctx.fillRect(0,0,W,H);
+
+  const pad={l:20,r:80,t:20,b:60};
+  const cw=14;
+  const prices=[
+    {o:100,c:104,h:106,l:98},{o:104,c:108,h:110,l:102},
+    {o:108,c:112,h:114,l:106},{o:112,c:108,h:113,l:106},
+    {o:108,c:104,h:109,l:103},{o:104,c:106,h:107,l:101},  // bounce 1
+    {o:106,c:112,h:113,l:105},{o:112,c:116,h:118,l:111},
+    {o:116,c:120,h:122,l:114},{o:120,c:115,h:121,l:113},
+    {o:115,c:111,h:116,l:110},{o:111,c:113,h:114,l:109},  // bounce 2
+    {o:113,c:119,h:121,l:112},{o:119,c:124,h:126,l:118},
+    {o:124,c:128,h:130,l:122},{o:128,c:122,h:129,l:120},
+    {o:122,c:118,h:123,l:117},{o:118,c:121,h:122,l:116},  // bounce 3 (entry)
+    {o:121,c:127,h:129,l:120},{o:127,c:133,h:135,l:126},
+    {o:133,c:140,h:142,l:132}
+  ];
+
+  const priceMin=95, priceMax=148;
+  const toY=p=>pad.t+(priceMax-p)/(priceMax-priceMin)*(H-pad.t-pad.b);
+  const toX=i=>pad.l+i*(cw+2)+cw/2;
+
+  // TL
+  const tlPoints=[{i:5,p:101},{i:11,p:109},{i:17,p:117}];
+  drawLine(ctx,toX(0),toY(97),toX(20),toY(121),'#58a6ff',[],2);
+
+  // Candles
+  prices.forEach((c,i)=>drawCandle(ctx,toX(i),toY(c.o),toY(c.c),toY(c.h),toY(c.l),cw*0.7));
+
+  // Bounce circles
+  [5,11,17].forEach(i=>{
+    ctx.beginPath(); ctx.arc(toX(i),toY(prices[i].l),8,0,Math.PI*2);
+    ctx.strokeStyle='#58a6ff'; ctx.lineWidth=2; ctx.stroke();
+  });
+
+  // Entry arrow at bounce 3
+  const entryX=toX(17), entryY=toY(prices[17].l);
+  ctx.beginPath(); ctx.moveTo(entryX,entryY+22); ctx.lineTo(entryX,entryY+8);
+  ctx.strokeStyle='#3fb950'; ctx.lineWidth=2; ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(entryX-5,entryY+10); ctx.lineTo(entryX,entryY+4); ctx.lineTo(entryX+5,entryY+10);
+  ctx.fillStyle='#3fb950'; ctx.fill();
+
+  // TP levels
+  const tp1Y=toY(133), tp2Y=toY(140);
+  drawLine(ctx,toX(18),tp1Y,toX(20)+20,tp1Y,'#e3b341',[4,4],1.5);
+  drawLine(ctx,toX(18),tp2Y,toX(20)+20,tp2Y,'#bc8cff',[4,4],1.5);
+
+  // SL
+  drawLine(ctx,toX(17)-10,toY(112),toX(20)+20,toY(112),'#f85149',[4,4],1.5);
+
+  // Labels
+  const lx=toX(20)+25;
+  label(ctx,lx,tp2Y+4,'TP2','#bc8cff',11);
+  label(ctx,lx,tp1Y+4,'TP1','#e3b341',11);
+  label(ctx,lx,toY(112)+4,'SL','#f85149',11);
+  label(ctx,entryX,entryY+36,'ENTRY','#3fb950',11,'center');
+  label(ctx,toX(20)+25,toY(119)+4,'TL','#58a6ff',11);
+
+  // Annotations
+  label(ctx,pad.l,H-12,'Bounce 1','#8b949e',10);
+  label(ctx,toX(10),H-12,'Bounce 2','#8b949e',10);
+  label(ctx,toX(16),H-12,'Bounce 3','#3fb950',10);
+}
+
+// ─── Strategy B Chart ─────────────────────────────────────────────────────────
+function drawStratB(){
+  const ctx = CTX('stratBChart');
+  const W=ctx.canvas.width, H=ctx.canvas.height;
+  ctx.fillStyle='#161b22'; ctx.fillRect(0,0,W,H);
+
+  const pad={l:20,r:90,t:20,b:50};
+  const cw=12;
+
+  // Downtrend → breakout → retest → rally
+  const prices=[
+    {o:150,c:146,h:152,l:144},{o:146,c:143,h:147,l:140},
+    {o:143,c:148,h:150,l:141},{o:148,c:144,h:149,l:142},
+    {o:144,c:141,h:145,l:138},{o:141,c:144,h:146,l:139},
+    {o:144,c:140,h:145,l:137},{o:140,c:143,h:144,l:138},
+    {o:143,c:138,h:144,l:136},{o:138,c:142,h:143,l:136},
+    // breakout candle
+    {o:142,c:152,h:154,l:141},
+    // post breakout
+    {o:152,c:156,h:158,l:150},
+    // retest
+    {o:156,c:149,h:157,l:147},{o:149,c:151,h:153,l:148},
+    // entry + rally
+    {o:151,c:158,h:160,l:150},{o:158,c:165,h:167,l:157},
+    {o:165,c:170,h:172,l:163}
+  ];
+
+  const priceMin=132, priceMax=178;
+  const toY=p=>pad.t+(priceMax-p)/(priceMax-priceMin)*(H-pad.t-pad.b);
+  const toX=i=>pad.l+i*(cw+2)+cw/2;
+
+  // Downtrend TL (drawn as resistance line)
+  drawLine(ctx,toX(0),toY(152),toX(10),toY(143),'#f85149',[],2);
+
+  // Candles
+  prices.forEach((c,i)=>{
+    const special = i===10;
+    if(special){ ctx.globalAlpha=1; }
+    drawCandle(ctx,toX(i),toY(c.o),toY(c.c),toY(c.h),toY(c.l),cw*0.7);
+    if(special) ctx.globalAlpha=1;
+  });
+
+  // Breakout highlight
+  ctx.strokeStyle='#58a6ff80'; ctx.lineWidth=20; ctx.lineCap='round';
+  ctx.strokeRect(toX(10),toY(154),0,toY(141)-toY(154));
+  ctx.globalAlpha=.15;
+  ctx.fillStyle='#58a6ff';
+  ctx.fillRect(toX(10)-8,toY(154),16,toY(141)-toY(154));
+  ctx.globalAlpha=1;
+
+  // Extended TL as support
+  drawLine(ctx,toX(10),toY(143),toX(16)+20,toY(143),'#58a6ff',[4,4],1.5);
+
+  // Retest zone
+  ctx.globalAlpha=.1;
+  ctx.fillStyle='#58a6ff';
+  ctx.fillRect(toX(12),toY(153),toX(14)-toX(12)+cw,toY(143)-toY(153));
+  ctx.globalAlpha=1;
+
+  // Entry arrow
+  const ex=toX(14), ey=toY(prices[14].l);
+  ctx.beginPath(); ctx.moveTo(ex,ey+20); ctx.lineTo(ex,ey+6);
+  ctx.strokeStyle='#3fb950'; ctx.lineWidth=2; ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(ex-5,ey+8); ctx.lineTo(ex,ey+2); ctx.lineTo(ex+5,ey+8);
+  ctx.fillStyle='#3fb950'; ctx.fill();
+
+  // Measured move arrow
+  const mmH = toY(143)-toY(152); // height difference
+  drawLine(ctx,toX(16)+10,toY(143),toX(16)+10,toY(161),'#e3b341',[],1.5);
+  ctx.beginPath(); ctx.moveTo(toX(16)+5,toY(161)+5); ctx.lineTo(toX(16)+10,toY(161)+12); ctx.lineTo(toX(16)+15,toY(161)+5);
+  ctx.fillStyle='#e3b341'; ctx.fill();
+
+  // Labels
+  const lx=W-85;
+  label(ctx,toX(10),toY(156)+14,'BREAKOUT','#58a6ff',10,'center');
+  label(ctx,toX(13),H-12,'RE-TEST','#8b949e',10,'center');
+  label(ctx,ex,ey+32,'ENTRY','#3fb950',11,'center');
+  label(ctx,toX(16)+16,toY(152),'MM TP','#e3b341',10);
+  label(ctx,toX(10),toY(144)+3,'TL (neu: Support)','#58a6ff',9,'center');
+  label(ctx,pad.l+2,toY(153)-4,'TL (alt: Widerstand)','#f85149',9);
+}
+
+// ─── Fake Break Chart ────────────────────────────────────────────────────────
+function drawFakeBreak(){
+  const ctx = CTX('fakeBreakChart');
+  const W=ctx.canvas.width, H=ctx.canvas.height;
+  ctx.fillStyle='#161b22'; ctx.fillRect(0,0,W,H);
+
+  const pad={l:10,r:10,t:20,b:20};
+  const half=W/2-10;
+
+  // Left: fake break
+  ctx.save(); ctx.translate(pad.l,0);
+  const fakePrices=[
+    {o:100,c:103,h:105,l:98},{o:103,c:106,h:108,l:102},
+    {o:106,c:103,h:107,l:101},{o:103,c:101,h:104,l:99},
+    {o:101,c:105,h:109,l:100},{o:105,c:102,h:106,l:101},
+    {o:102,c:104,h:105,l:100}
+  ];
+  const fmin=95,fmax=114;
+  const toFY=p=>pad.t+(fmax-p)/(fmax-fmin)*(H-pad.t-pad.b);
+  const cw=14, gap=2;
+  drawLine(ctx,10,toFY(98),half-10,toFY(103),'#58a6ff',[],2);
+  fakePrices.forEach((c,i)=>drawCandle(ctx,10+i*(cw+gap)+cw/2,toFY(c.o),toFY(c.c),toFY(c.h),toFY(c.l),cw*0.7));
+  // fake break candle highlight
+  ctx.globalAlpha=.2; ctx.fillStyle='#f85149';
+  ctx.fillRect(10+4*(cw+gap),toFY(109),cw,toFY(100)-toFY(109)); ctx.globalAlpha=1;
+  label(ctx,half/2,H-4,'❌ Fake-Break (kein 4H Schluss)','#f85149',10,'center');
+  ctx.restore();
+
+  // Divider
+  drawLine(ctx,W/2,10,W/2,H-10,'#30363d',[4,4],1);
+
+  // Right: valid break
+  ctx.save(); ctx.translate(W/2+10,0);
+  const validPrices=[
+    {o:100,c:103,h:105,l:98},{o:103,c:106,h:108,l:102},
+    {o:106,c:103,h:107,l:101},{o:103,c:101,h:104,l:99},
+    {o:101,c:108,h:111,l:100},{o:108,c:113,h:115,l:107},
+    {o:113,c:116,h:118,l:112}
+  ];
+  const vmin=95,vmax=122;
+  const toVY=p=>pad.t+(vmax-p)/(vmax-vmin)*(H-pad.t-pad.b);
+  drawLine(ctx,10,toVY(98),half-10,toVY(103),'#58a6ff',[],2);
+  validPrices.forEach((c,i)=>drawCandle(ctx,10+i*(cw+gap)+cw/2,toVY(c.o),toVY(c.c),toVY(c.h),toVY(c.l),cw*0.7));
+  ctx.globalAlpha=.2; ctx.fillStyle='#3fb950';
+  ctx.fillRect(10+4*(cw+gap),toVY(111),cw,toVY(100)-toVY(111)); ctx.globalAlpha=1;
+  label(ctx,(half-20)/2,H-4,'✅ Valider Bruch (4H Schluss darüber)','#3fb950',10,'center');
+  ctx.restore();
+}
+
+// ─── Rising Wedge ────────────────────────────────────────────────────────────
+function drawWedgeRising(){
+  const ctx = CTX('wedgeRisingChart');
+  const W=ctx.canvas.width, H=ctx.canvas.height;
+  ctx.fillStyle='#161b22'; ctx.fillRect(0,0,W,H);
+  const pad={l:20,r:60,t:20,b:40};
+
+  // Rising wedge: narrowing upward channel
+  const n=18, cw=10;
+  const toX=i=>pad.l+i*((W-pad.l-pad.r)/n);
+  const topSlope=0.8, botSlope=1.8;
+  const topStart=200, botStart=160;
+  const toY=p=>H-pad.b-(p-100)*(H-pad.t-pad.b)/120;
+
+  // Wedge fill
+  ctx.globalAlpha=.06; ctx.fillStyle='#f85149';
+  ctx.beginPath();
+  ctx.moveTo(toX(0),toY(topStart));
+  ctx.lineTo(toX(n),toY(topStart+topSlope*n));
+  ctx.lineTo(toX(n),toY(botStart+botSlope*n));
+  ctx.lineTo(toX(0),toY(botStart));
+  ctx.closePath(); ctx.fill(); ctx.globalAlpha=1;
+
+  // Lines
+  drawLine(ctx,toX(0),toY(topStart),toX(n-2),toY(topStart+topSlope*(n-2)),'#f85149',[],2);
+  drawLine(ctx,toX(0),toY(botStart),toX(n-2),toY(botStart+botSlope*(n-2)),'#f85149',[],2);
+
+  // Candles
+  for(let i=0;i<n;i++){
+    const mid=(topStart+topSlope*i + botStart+botSlope*i)/2;
+    const range=(topStart+topSlope*i - botStart-botSlope*i)*.3;
+    const o=mid-range*(Math.random()*.6);
+    const c=mid+range*(Math.random()*.6);
+    const h=Math.max(o,c)+range*.3;
+    const l=Math.min(o,c)-range*.3;
+    drawCandle(ctx,toX(i)+cw/2,toY(o),toY(c),toY(h),toY(l),cw*.7);
+  }
+
+  // Break arrow
+  const bx=toX(n-1), boty=toY(botStart+botSlope*(n-1));
+  ctx.beginPath(); ctx.moveTo(bx,boty); ctx.lineTo(bx+20,boty+30);
+  ctx.strokeStyle='#f85149'; ctx.lineWidth=2; ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(bx+14,boty+28); ctx.lineTo(bx+22,boty+34); ctx.lineTo(bx+20,boty+22);
+  ctx.fillStyle='#f85149'; ctx.fill();
+  label(ctx,bx+24,boty+36,'SHORT','#f85149',11);
+
+  label(ctx,W/2,H-8,'Rising Wedge → Bruch unten','#8b949e',11,'center');
+}
+
+// ─── Falling Wedge ───────────────────────────────────────────────────────────
+function drawWedgeFalling(){
+  const ctx = CTX('wedgeFallingChart');
+  const W=ctx.canvas.width, H=ctx.canvas.height;
+  ctx.fillStyle='#161b22'; ctx.fillRect(0,0,W,H);
+  const pad={l:20,r:60,t:20,b:40};
+
+  const n=18, cw=10;
+  const toX=i=>pad.l+i*((W-pad.l-pad.r)/n);
+  const topSlope=-1.8, botSlope=-0.8;
+  const topStart=220, botStart=190;
+  const toY=p=>H-pad.b-(p-100)*(H-pad.t-pad.b)/130;
+
+  ctx.globalAlpha=.06; ctx.fillStyle='#3fb950';
+  ctx.beginPath();
+  ctx.moveTo(toX(0),toY(topStart));
+  ctx.lineTo(toX(n),toY(topStart+topSlope*n));
+  ctx.lineTo(toX(n),toY(botStart+botSlope*n));
+  ctx.lineTo(toX(0),toY(botStart));
+  ctx.closePath(); ctx.fill(); ctx.globalAlpha=1;
+
+  drawLine(ctx,toX(0),toY(topStart),toX(n-2),toY(topStart+topSlope*(n-2)),'#3fb950',[],2);
+  drawLine(ctx,toX(0),toY(botStart),toX(n-2),toY(botStart+botSlope*(n-2)),'#3fb950',[],2);
+
+  for(let i=0;i<n;i++){
+    const mid=(topStart+topSlope*i + botStart+botSlope*i)/2;
+    const range=(topStart+topSlope*i - botStart-botSlope*i)*.3;
+    const o=mid+range*(Math.random()*.6);
+    const c=mid-range*(Math.random()*.6);
+    const h=Math.max(o,c)+range*.3;
+    const l=Math.min(o,c)-range*.3;
+    drawCandle(ctx,toX(i)+cw/2,toY(o),toY(c),toY(h),toY(l),cw*.7);
+  }
+
+  const bx=toX(n-1), topy=toY(topStart+topSlope*(n-1));
+  ctx.beginPath(); ctx.moveTo(bx,topy); ctx.lineTo(bx+20,topy-30);
+  ctx.strokeStyle='#3fb950'; ctx.lineWidth=2; ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(bx+14,topy-28); ctx.lineTo(bx+22,topy-34); ctx.lineTo(bx+20,topy-22);
+  ctx.fillStyle='#3fb950'; ctx.fill();
+  label(ctx,bx+24,topy-36,'LONG','#3fb950',11);
+
+  label(ctx,W/2,H-8,'Falling Wedge → Bruch oben','#8b949e',11,'center');
+}
+
+// ─── Indicator Chart ─────────────────────────────────────────────────────────
+function drawIndicatorChart(){
+  const ctx = CTX('indicatorChart');
+  const W=ctx.canvas.width, H=ctx.canvas.height;
+  ctx.fillStyle='#161b22'; ctx.fillRect(0,0,W,H);
+
+  const chartH=H*0.65, rsiH=H*0.28;
+  const pad={l:10,r:10,t:15,b:8};
+  const n=30, cw=Math.floor((W-pad.l-pad.r)/n)-1;
+
+  const prices=[];
+  let p=130;
+  for(let i=0;i<n;i++){
+    const o=p+(Math.random()-.45)*4;
+    const c=o+(Math.random()-.4)*5+0.5;
+    const h=Math.max(o,c)+(Math.random()*2);
+    const l=Math.min(o,c)-(Math.random()*2);
+    prices.push({o,c,h,l});
+    p=c;
+  }
+
+  const pmin=Math.min(...prices.map(x=>x.l))-3;
+  const pmax=Math.max(...prices.map(x=>x.h))+8;
+  const toY=p2=>pad.t+(pmax-p2)/(pmax-pmin)*chartH;
+  const toX=i=>pad.l+i*(cw+1)+cw/2;
+
+  // EMA overlays
+  const ema=(arr,period)=>{
+    const k=2/(period+1); let em=arr[0].c;
+    return arr.map(x=>{em=x.c*k+em*(1-k);return em;});
+  };
+  [[21,'#ff9500'],[55,'#58a6ff'],[200,'#f85149']].forEach(([p2,col])=>{
+    const e=ema(prices,p2);
+    ctx.strokeStyle=col+'aa'; ctx.lineWidth=1.5; ctx.setLineDash([]);
+    ctx.beginPath(); e.forEach((v,i)=>{const y=toY(v); i===0?ctx.moveTo(toX(i),y):ctx.lineTo(toX(i),y);}); ctx.stroke();
+  });
+
+  prices.forEach((c,i)=>drawCandle(ctx,toX(i),toY(c.o),toY(c.c),toY(c.h),toY(c.l),cw*0.7));
+
+  // RSI section
+  const rsiY=chartH+pad.t+8;
+  ctx.fillStyle='#1c2330'; ctx.fillRect(pad.l,rsiY,W-pad.l-pad.r,rsiH);
+  // RSI zones
+  ctx.globalAlpha=.08; ctx.fillStyle='#f85149'; ctx.fillRect(pad.l,rsiY,W-pad.l-pad.r,rsiH*0.3); // overbought
+  ctx.fillStyle='#3fb950'; ctx.fillRect(pad.l,rsiY+rsiH*0.7,W-pad.l-pad.r,rsiH*0.3); // oversold
+  ctx.globalAlpha=1;
+  // Fake RSI line
+  ctx.strokeStyle='#3fb950'; ctx.lineWidth=1.5;
+  ctx.beginPath();
+  prices.forEach((c,i)=>{
+    const rsi=35+Math.sin(i*0.4)*25+15*(c.c>c.o?1:-1);
+    const ry=rsiY+rsiH-(rsi/100)*rsiH;
+    i===0?ctx.moveTo(toX(i),ry):ctx.lineTo(toX(i),ry);
+  }); ctx.stroke();
+  label(ctx,pad.l+4,rsiY+10,'RSI 14','#3fb950',10);
+  label(ctx,W-pad.r-4,rsiY+10,'70','#f85149',9,'right');
+  label(ctx,W-pad.r-4,rsiY+rsiH-4,'30','#3fb950',9,'right');
+
+  // Legend
+  const lx=pad.l+6, ly=chartH+2;
+  [[' EMA 21','#ff9500'],[' EMA 55','#58a6ff'],[' EMA 200','#f85149']].forEach(([t,c],i)=>{
+    ctx.fillStyle=c; ctx.fillRect(lx+i*70,ly,10,3);
+    label(ctx,lx+i*70+13,ly+5,t,c,9);
+  });
+}
+
+// ─── RSI Chart ────────────────────────────────────────────────────────────────
+function drawRSIChart(){
+  const ctx = CTX('rsiChart');
+  const W=ctx.canvas.width, H=ctx.canvas.height;
+  ctx.fillStyle='#1c2330'; ctx.fillRect(0,0,W,H);
+  const pad={l:40,r:20,t:10,b:10};
+  const toX=v=>pad.l+(v/100)*(W-pad.l-pad.r);
+  const midY=H/2;
+
+  // zones
+  const zones=[
+    [0,30,'#3fb95020'],[30,45,'#e3b34120'],[45,55,'#30363d'],[55,70,'#58a6ff20'],[70,100,'#f8514920']
+  ];
+  zones.forEach(([a,b,c])=>{
+    ctx.fillStyle=c; ctx.fillRect(toX(a),pad.t,toX(b)-toX(a),H-pad.t-pad.b);
+  });
+
+  // Lines
+  [30,45,55,70].forEach(v=>{
+    ctx.strokeStyle='#30363d'; ctx.lineWidth=1; ctx.setLineDash([3,3]);
+    ctx.beginPath(); ctx.moveTo(toX(v),pad.t); ctx.lineTo(toX(v),H-pad.b); ctx.stroke();
+  });
+  ctx.setLineDash([]);
+
+  // Labels
+  label(ctx,toX(15),midY+4,'Überverkauft','#3fb950',10,'center');
+  label(ctx,toX(37.5),midY+4,'Strat. A','#e3b341',10,'center');
+  label(ctx,toX(50),midY+4,'Neutral','#8b949e',10,'center');
+  label(ctx,toX(62.5),midY+4,'Breakout','#58a6ff',10,'center');
+  label(ctx,toX(85),midY+4,'Überkauft','#f85149',10,'center');
+
+  [0,30,45,55,70,100].forEach(v=>{
+    label(ctx,toX(v),H-1,String(v),'#8b949e',9,'center');
+  });
+}
+
+// ─── Position Calculator Chart ───────────────────────────────────────────────
+function drawPosCalc(){
+  const ctx = CTX('posCalcChart');
+  const W=ctx.canvas.width, H=ctx.canvas.height;
+  ctx.fillStyle='#1c2330'; ctx.fillRect(0,0,W,H);
+
+  // Risk scenarios
+  const scenarios=[
+    {label:'0.5%',risk:50,color:'#3fb950'},
+    {label:'1%',  risk:100,color:'#58a6ff'},
+    {label:'1.5%',risk:150,color:'#e3b341'},
+    {label:'2%',  risk:200,color:'#f85149'},
+  ];
+  const capital=10000, slPct=0.06;
+  const pad={l:60,r:20,t:20,b:30};
+  const barW=(W-pad.l-pad.r)/(scenarios.length+1);
+  const maxPos=scenarios[scenarios.length-1].risk/slPct;
+  const toH=v=>(v/maxPos)*(H-pad.t-pad.b);
+
+  scenarios.forEach((s,i)=>{
+    const pos=s.risk/slPct;
+    const bh=toH(pos);
+    const bx=pad.l+i*barW+barW*.2;
+    const by=H-pad.b-bh;
+    ctx.fillStyle=s.color+'40'; ctx.fillRect(bx,by,barW*.6,bh);
+    ctx.strokeStyle=s.color; ctx.lineWidth=1.5; ctx.strokeRect(bx,by,barW*.6,bh);
+    label(ctx,bx+barW*.3,H-pad.b+12,s.label,s.color,10,'center');
+    label(ctx,bx+barW*.3,by-4,`${pos.toFixed(0)}$`,s.color,10,'center');
+  });
+
+  label(ctx,pad.l-4,H-pad.b,'0','#8b949e',9,'right');
+  label(ctx,pad.l-4,H-pad.b-toH(maxPos/2),`${(maxPos/2).toFixed(0)}$`,'#8b949e',9,'right');
+  label(ctx,W/2,14,'Positionsgröße nach Risiko% (Kapital 10k$, SL 6%)','#8b949e',10,'center');
+}
+
+// ─── Decision Tree ───────────────────────────────────────────────────────────
+function drawTree(){
+  const ctx = CTX('treeChart');
+  const W=ctx.canvas.width, H=ctx.canvas.height;
+  ctx.fillStyle='#161b22'; ctx.fillRect(0,0,W,H);
+
+  const box=(x,y,w,h,text,subtext,color,fill)=>{
+    ctx.fillStyle=fill||color+'20';
+    roundRect(ctx,x-w/2,y,w,h,8);
+    ctx.fill();
+    ctx.strokeStyle=color; ctx.lineWidth=1.5;
+    roundRect(ctx,x-w/2,y,w,h,8);
+    ctx.stroke();
+    ctx.fillStyle=color; ctx.font='bold 12px Segoe UI,sans-serif'; ctx.textAlign='center';
+    ctx.fillText(text,x,y+h/2+(subtext?-4:4));
+    if(subtext){ ctx.fillStyle='#8b949e'; ctx.font='10px Segoe UI,sans-serif'; ctx.fillText(subtext,x,y+h/2+10); }
+  };
+
+  const roundRect=(ctx2,x,y,w,h,r)=>{
+    ctx2.beginPath(); ctx2.moveTo(x+r,y);
+    ctx2.lineTo(x+w-r,y); ctx2.quadraticCurveTo(x+w,y,x+w,y+r);
+    ctx2.lineTo(x+w,y+h-r); ctx2.quadraticCurveTo(x+w,y+h,x+w-r,y+h);
+    ctx2.lineTo(x+r,y+h); ctx2.quadraticCurveTo(x,y+h,x,y+h-r);
+    ctx2.lineTo(x,y+r); ctx2.quadraticCurveTo(x,y,x+r,y); ctx2.closePath();
+  };
+
+  const arr=(x1,y1,x2,y2,label2,lcolor)=>{
+    drawLine(ctx,x1,y1,x2,y2,'#30363d',[],1.5);
+    ctx.beginPath(); ctx.moveTo(x2-4,y2-7); ctx.lineTo(x2,y2); ctx.lineTo(x2+4,y2-7);
+    ctx.fillStyle='#30363d'; ctx.fill();
+    if(label2){ const mx=(x1+x2)/2, my=(y1+y2)/2;
+      label(ctx,mx+6,my,label2,lcolor||'#8b949e',10,'left'); }
+  };
+
+  const cW=W;
+  // Root
+  box(cW/2,10,200,40,'SOL 4H Setup-Check','Neue Kerze geöffnet','#58a6ff');
+  arr(cW/2,50,cW/2,74);
+
+  // TL vorhanden?
+  box(cW/2,74,220,40,'Trendlinie vorhanden?','min. 2 Berührungspunkte','#8b949e');
+  arr(cW/2,114,cW*0.22,148,'NEIN','#f85149');
+  arr(cW/2,114,cW*0.78,148,'JA','#3fb950');
+
+  // No TL
+  box(cW*0.22,148,150,40,'Warten','S&R Level suchen','#f85149');
+
+  // TL yes → at line?
+  box(cW*0.78,148,200,40,'Kurs an der Linie?','TL-Berührung aktiv','#8b949e');
+  arr(cW*0.78,188,cW*0.58,222,'Bounce-Setup?','#3fb950');
+  arr(cW*0.78,188,cW*0.98,222,'Bruch-Setup?','#e3b341');
+
+  // Bounce path
+  box(cW*0.58,222,180,40,'Kerzenformation?','Engulfing/Hammer/Pin Bar','#3fb950');
+  arr(cW*0.58,262,cW*0.4,296,'+ RSI 35-45','#3fb950');
+  arr(cW*0.58,262,cW*0.75,296,'RSI fehlt','#f85149');
+
+  box(cW*0.4,296,180,40,'Volumen Bestätigung?','↓ Pullback → ↑ Bounce','#3fb950');
+  arr(cW*0.4,336,cW*0.4,370,'✓','#3fb950');
+
+  box(cW*0.4,370,160,40,'EINSTIEG A','Strategie A – Bounce','#3fb950','#3fb95030');
+
+  // Breakout path
+  box(cW*0.98,222,170,40,'4H Kerzenschluss?','Klar über/unter TL','#e3b341');
+  arr(cW*0.98,262,cW*0.98,296,'+ Volumen ↑','#e3b341');
+
+  box(cW*0.98,296,170,40,'RSI-Filter?','Bull: >55 · Bear: <45','#e3b341');
+  arr(cW*0.98,336,cW*0.98,370,'✓','#e3b341');
+
+  box(cW*0.98,370,160,40,'EINSTIEG B','Strategie B – Breakout','#58a6ff','#58a6ff30');
+
+  // Bottom: Daily trend check
+  arr(cW/2,50,cW*0.07,370);
+  box(cW*0.07,370,145,40,'Daily bullisch?','SOL > 200 EMA (1D)','#bc8cff');
+  arr(cW*0.07,410,cW*0.07,444,'JA →','#bc8cff');
+  box(cW*0.07,444,130,38,'Nur Longs','Höhere Win-Rate','#3fb950');
+
+  // Risk label at bottom
+  const botY=H-20;
+  label(ctx,W/2,botY,'Risiko: max. 1–2% Kapital · R:R min. 1:2 · SL 5–8% unter TL','#8b949e',11,'center');
+}
+
+// ─── Draw All ────────────────────────────────────────────────────────────────
+function drawAll(){
+  const active=document.querySelector('.page.active').id;
+  if(active==='overview'){drawOverview();}
+  if(active==='stratA'){drawStratA();}
+  if(active==='stratB'){drawStratB();drawFakeBreak();}
+  if(active==='stratC'){drawWedgeRising();drawWedgeFalling();}
+  if(active==='indicators'){drawIndicatorChart();drawRSIChart();drawPosCalc();}
+  if(active==='risk'){drawPosCalc();}
+  if(active==='tree'){drawTree();}
+}
+
+window.addEventListener('load',()=>{
+  setTimeout(drawAll,100);
+});
+window.addEventListener('resize',drawAll);
+</script>
+</body>
+</html>

@@ -1,0 +1,383 @@
+[
+  {
+    "ts": "2026-06-04T20:33:26.069372+00:00",
+    "decided_after": 308,
+    "new_signals": 308,
+    "forced": true,
+    "actions": [
+      "Gewichte: 20 Muster aktualisiert",
+      "Performance-Report aktualisiert",
+      "Thresholds: 9 Anpassung(en)",
+      "XGBoost trainiert: Accuracy=76.0% (aktiv)",
+      "Win-Rate-Trend: +0.0% (vorher 76.3%, nachher 76.3%)"
+    ],
+    "metrics_before": {
+      "win_rate": 76.3,
+      "total": 358,
+      "win": 235,
+      "loss": 73,
+      "patterns": null,
+      "live_weight": 0.7,
+      "bt_samples": 302
+    },
+    "metrics_after": {
+      "win_rate": 76.3,
+      "total": 358,
+      "win": 235,
+      "loss": 73,
+      "patterns": null,
+      "live_weight": 0.7,
+      "bt_samples": 308
+    },
+    "best_pattern": "EQH neutral 30m Score=64/100 WR=100.0% N=15",
+    "model_accuracy": 75.95,
+    "win_rate_delta": 0.0
+  },
+  {
+    "ts": "2026-06-04T21:19:55.417073+00:00",
+    "decided_after": 308,
+    "new_signals": 0,
+    "forced": true,
+    "actions": [
+      "Gewichte: 20 Muster aktualisiert",
+      "Performance-Report aktualisiert",
+      "Thresholds: 7 Anpassung(en)",
+      "XGBoost trainiert: Accuracy=75.6% (aktiv)",
+      "Win-Rate-Trend: +0.0% (vorher 76.6%, nachher 76.6%)"
+    ],
+    "metrics_before": {
+      "win_rate": 76.6,
+      "total": 358,
+      "win": 236,
+      "loss": 72,
+      "patterns": null,
+      "live_weight": 0.7,
+      "bt_samples": 302
+    },
+    "metrics_after": {
+      "win_rate": 76.6,
+      "total": 358,
+      "win": 236,
+      "loss": 72,
+      "patterns": null,
+      "live_weight": 0.7,
+      "bt_samples": 308
+    },
+    "best_pattern": "EQH neutral 30m Score=64/100 WR=100.0% N=15",
+    "model_accuracy": 75.63,
+    "win_rate_delta": 0.0
+  },
+  {
+    "ts": "2026-06-05T14:21:17.432583+00:00",
+    "decided_after": 311,
+    "new_signals": 3,
+    "forced": true,
+    "actions": [
+      "Gewichte: 20 Muster aktualisiert",
+      "Performance-Report aktualisiert",
+      "Thresholds: 6 Anpassung(en)",
+      "XGBoost trainiert: Accuracy=77.8% (aktiv)",
+      "Win-Rate-Trend: +0.0% (vorher 75.9%, nachher 75.9%)"
+    ],
+    "metrics_before": {
+      "win_rate": 75.9,
+      "total": 371,
+      "win": 236,
+      "loss": 75,
+      "patterns": null,
+      "live_weight": 0.7,
+      "bt_samples": 308
+    },
+    "metrics_after": {
+      "win_rate": 75.9,
+      "total": 371,
+      "win": 236,
+      "loss": 75,
+      "patterns": null,
+      "live_weight": 0.7003,
+      "bt_samples": 311
+    },
+    "best_pattern": "EQH neutral 30m Score=64/100 WR=100.0% N=15",
+    "model_accuracy": 77.81,
+    "win_rate_delta": 0.0
+  },
+  {
+    "ts": "2026-06-08T07:18:33.424083+00:00",
+    "decided_after": 328,
+    "new_signals": 17,
+    "forced": false,
+    "actions": [
+      "Gewichte: 21 Muster aktualisiert",
+      "Performance-Report aktualisiert",
+      "Thresholds: 4 Anpassung(en)",
+      "XGBoost trainiert: Accuracy=80.2% (aktiv)",
+      "Win-Rate-Trend: +0.0% (vorher 72.6%, nachher 72.6%)"
+    ],
+    "metrics_before": {
+      "win_rate": 72.6,
+      "total": 378,
+      "win": 238,
+      "loss": 90,
+      "patterns": null,
+      "live_weight": 0.7003,
+      "bt_samples": 311
+    },
+    "metrics_after": {
+      "win_rate": 72.6,
+      "total": 378,
+      "win": 238,
+      "loss": 90,
+      "patterns": null,
+      "live_weight": 0.702,
+      "bt_samples": 328
+    },
+    "best_pattern": "EQH neutral 30m Score=64/100 WR=100.0% N=15",
+    "model_accuracy": 80.17,
+    "win_rate_delta": 0.0
+  },
+  {
+    "ts": "2026-06-09T13:33:11.485655+00:00",
+    "decided_after": 330,
+    "new_signals": 2,
+    "forced": true,
+    "actions": [
+      "Gewichte: 21 Muster aktualisiert",
+      "Performance-Report aktualisiert",
+      "Thresholds: 5 Anpassung(en)",
+      "XGBoost trainiert: Accuracy=77.6% (aktiv)",
+      "Strategie-Builder Gen 3: 21 Regeln (19 BOOST · 2 BLOCK · 0 Combos)",
+      "Win-Rate-Trend: +0.0% (vorher 72.4%, nachher 72.4%)"
+    ],
+    "metrics_before": {
+      "win_rate": 72.4,
+      "total": 416,
+      "win": 239,
+      "loss": 91,
+      "patterns": null,
+      "live_weight": 0.702,
+      "bt_samples": 328
+    },
+    "metrics_after": {
+      "win_rate": 72.4,
+      "total": 416,
+      "win": 239,
+      "loss": 91,
+      "patterns": null,
+      "live_weight": 0.7022,
+      "bt_samples": 330
+    },
+    "best_pattern": "EQH neutral 30m Score=64/100 WR=100.0% N=15",
+    "model_accuracy": 77.58,
+    "win_rate_delta": 0.0
+  },
+  {
+    "ts": "2026-06-09T15:15:50.994391+00:00",
+    "decided_after": 331,
+    "new_signals": 1,
+    "forced": true,
+    "actions": [
+      "Gewichte: 21 Muster aktualisiert",
+      "Performance-Report aktualisiert",
+      "Thresholds: 3 Anpassung(en)",
+      "XGBoost trainiert: Accuracy=78.8% (aktiv)",
+      "Strategie-Builder Gen 4: 21 Regeln (19 BOOST · 2 BLOCK · 0 Combos)",
+      "Win-Rate-Trend: +0.0% (vorher 72.2%, nachher 72.2%)"
+    ],
+    "metrics_before": {
+      "win_rate": 72.2,
+      "total": 423,
+      "win": 239,
+      "loss": 92,
+      "patterns": null,
+      "live_weight": 0.7022,
+      "bt_samples": 330
+    },
+    "metrics_after": {
+      "win_rate": 72.2,
+      "total": 423,
+      "win": 239,
+      "loss": 92,
+      "patterns": null,
+      "live_weight": 0.7023,
+      "bt_samples": 331
+    },
+    "best_pattern": "EQH neutral 30m Score=64/100 WR=100.0% N=15",
+    "model_accuracy": 78.84,
+    "win_rate_delta": 0.0
+  },
+  {
+    "ts": "2026-06-12T13:49:17.100603+00:00",
+    "decided_after": 346,
+    "new_signals": 15,
+    "forced": false,
+    "actions": [
+      "Gewichte: 23 Muster aktualisiert",
+      "Performance-Report aktualisiert",
+      "Thresholds: 1 Anpassung(en)",
+      "XGBoost trainiert: Accuracy=79.5% (aktiv)",
+      "Strategie-Builder Gen 5: 24 Regeln (22 BOOST · 2 BLOCK · 0 Combos)",
+      "Win-Rate-Trend: +0.0% (vorher 73.4%, nachher 73.4%)"
+    ],
+    "metrics_before": {
+      "win_rate": 73.4,
+      "total": 437,
+      "win": 254,
+      "loss": 92,
+      "patterns": null,
+      "live_weight": 0.7023,
+      "bt_samples": 331
+    },
+    "metrics_after": {
+      "win_rate": 73.4,
+      "total": 437,
+      "win": 254,
+      "loss": 92,
+      "patterns": null,
+      "live_weight": 0.7038,
+      "bt_samples": 346
+    },
+    "best_pattern": "BOS bearish 15m Score=71/100 WR=100.0% N=5",
+    "model_accuracy": 79.47,
+    "win_rate_delta": 0.0
+  },
+  {
+    "ts": "2026-06-12T22:24:58.581555+00:00",
+    "decided_after": 346,
+    "new_signals": 0,
+    "forced": true,
+    "actions": [
+      "Gewichte: 7 Muster aktualisiert",
+      "Performance-Report aktualisiert",
+      "Thresholds: 1 Anpassung(en)",
+      "XGBoost trainiert: Accuracy=79.5% (aktiv)",
+      "Strategie-Builder Gen 7: 14 Regeln (12 BOOST · 2 BLOCK · 0 Combos)",
+      "Win-Rate-Trend: +0.0% (vorher 73.4%, nachher 73.4%)"
+    ],
+    "metrics_before": {
+      "win_rate": 73.4,
+      "total": 442,
+      "win": 254,
+      "loss": 92,
+      "patterns": null,
+      "live_weight": 0.7038,
+      "bt_samples": 346
+    },
+    "metrics_after": {
+      "win_rate": 73.4,
+      "total": 442,
+      "win": 254,
+      "loss": 92,
+      "patterns": null,
+      "live_weight": 0.7038,
+      "bt_samples": 346
+    },
+    "best_pattern": "BOS bearish 15m Score=71/100 WR=100.0% N=5.0",
+    "model_accuracy": 79.47,
+    "win_rate_delta": 0.0
+  },
+  {
+    "ts": "2026-06-18T13:36:15.537341+00:00",
+    "decided_after": 383,
+    "new_signals": 37,
+    "forced": false,
+    "actions": [
+      "Gewichte: 9 Muster aktualisiert",
+      "Performance-Report aktualisiert",
+      "Thresholds: 5 Anpassung(en)",
+      "XGBoost trainiert: Accuracy=81.5% (aktiv)",
+      "Strategie-Builder Gen 8: 16 Regeln (13 BOOST · 3 BLOCK · 0 Combos)",
+      "Win-Rate-Trend: +0.0% (vorher 67.1%, nachher 67.1%)"
+    ],
+    "metrics_before": {
+      "win_rate": 67.1,
+      "total": 481,
+      "win": 257,
+      "loss": 126,
+      "patterns": null,
+      "live_weight": 0.7038,
+      "bt_samples": 346
+    },
+    "metrics_after": {
+      "win_rate": 67.1,
+      "total": 484,
+      "win": 257,
+      "loss": 126,
+      "patterns": null,
+      "live_weight": 0.7113,
+      "bt_samples": 471
+    },
+    "best_pattern": "BOS bearish 15m Score=71/100 WR=100.0% N=5.0",
+    "model_accuracy": 81.45,
+    "win_rate_delta": 0.0
+  },
+  {
+    "ts": "2026-06-18T13:36:24.079222+00:00",
+    "decided_after": 384,
+    "new_signals": 1,
+    "forced": true,
+    "actions": [
+      "Gewichte: 9 Muster aktualisiert",
+      "Performance-Report aktualisiert",
+      "Thresholds: 4 Anpassung(en)",
+      "XGBoost trainiert: Accuracy=78.1% (aktiv)",
+      "Strategie-Builder Gen 10: 16 Regeln (13 BOOST · 3 BLOCK · 0 Combos)",
+      "Win-Rate-Trend: +0.0% (vorher 67.2%, nachher 67.2%)"
+    ],
+    "metrics_before": {
+      "win_rate": 67.2,
+      "total": 484,
+      "win": 258,
+      "loss": 126,
+      "patterns": null,
+      "live_weight": 0.7113,
+      "bt_samples": 471
+    },
+    "metrics_after": {
+      "win_rate": 67.2,
+      "total": 484,
+      "win": 258,
+      "loss": 126,
+      "patterns": null,
+      "live_weight": 0.7114,
+      "bt_samples": 472
+    },
+    "best_pattern": "BOS bearish 15m Score=71/100 WR=100.0% N=5.0",
+    "model_accuracy": 78.13,
+    "win_rate_delta": 0.0
+  },
+  {
+    "ts": "2026-06-18T13:36:24.893761+00:00",
+    "decided_after": 385,
+    "new_signals": 1,
+    "forced": true,
+    "actions": [
+      "Gewichte: 9 Muster aktualisiert",
+      "Performance-Report aktualisiert",
+      "Thresholds: 4 Anpassung(en)",
+      "XGBoost trainiert: Accuracy=77.7% (aktiv)",
+      "Strategie-Builder Gen 11: 16 Regeln (13 BOOST · 3 BLOCK · 0 Combos)",
+      "Win-Rate-Trend: +0.0% (vorher 67.0%, nachher 67.0%)"
+    ],
+    "metrics_before": {
+      "win_rate": 67.0,
+      "total": 484,
+      "win": 258,
+      "loss": 127,
+      "patterns": null,
+      "live_weight": 0.7114,
+      "bt_samples": 472
+    },
+    "metrics_after": {
+      "win_rate": 67.0,
+      "total": 484,
+      "win": 258,
+      "loss": 127,
+      "patterns": null,
+      "live_weight": 0.7115,
+      "bt_samples": 473
+    },
+    "best_pattern": "BOS bearish 15m Score=71/100 WR=100.0% N=5.0",
+    "model_accuracy": 77.66,
+    "win_rate_delta": 0.0
+  }
+]

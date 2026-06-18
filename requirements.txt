@@ -1,0 +1,17 @@
+# SOL/USDT Analyzer — Python-Abhängigkeiten
+# Installieren: pip install -r requirements.txt
+
+# Bestehende Abhängigkeiten
+pandas>=2.0
+matplotlib>=3.7
+Pillow>=10.0
+requests>=2.31
+python-dotenv>=1.0
+anthropic>=0.40
+
+# Self-Learning Layer (neu)
+xgboost>=2.0
+scikit-learn>=1.4
+schedule>=1.2
+
+# SQLite ist in Python-Standardbibliothek enthalten (kein separates Paket nötig)

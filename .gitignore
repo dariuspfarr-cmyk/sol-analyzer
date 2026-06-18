@@ -1,0 +1,41 @@
+# ── Python ────────────────────────────────────────────────
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+.mypy_cache/
+.ruff_cache/
+
+# ── Node / ESLint ─────────────────────────────────────────
+node_modules/
+npm-debug.log*
+
+# ── Laufzeit-Daten des Bots (ändern sich ständig) ─────────
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+state.json
+trades.csv
+trades.json
+daily_performance.json
+error.log
+*.log
+
+# ── Caches ────────────────────────────────────────────────
+research_cache.json
+bull_run_cache.json
+
+# ── Generierte Charts ─────────────────────────────────────
+charts/
+*.png
+
+# ── Secrets / lokale Umgebung ─────────────────────────────
+# .env kann künftig Secrets enthalten → nie committen.
+# Die Vorlage .env.example bleibt versioniert.
+.env
+
+# ── OS / Editor ───────────────────────────────────────────
+Thumbs.db
+.DS_Store
+.vscode/*.local

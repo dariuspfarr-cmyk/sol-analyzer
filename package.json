@@ -1,0 +1,15 @@
+{
+  "name": "sol-analyzer-tooling",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Dev-Tooling (ESLint) fuer die HTML/JS-Dashboards des SOL Analyzers",
+  "scripts": {
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix"
+  },
+  "devDependencies": {
+    "eslint": "^9.15.0",
+    "eslint-plugin-html": "^8.1.2",
+    "globals": "^15.12.0"
+  }
+}

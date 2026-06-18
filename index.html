@@ -1,0 +1,451 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>SOL Analyzer</title>
+<style>
+:root {
+  --bg:   #07090d;
+  --s1:   #0d1117;
+  --s2:   #161b22;
+  --b:    #21262d;
+  --b2:   #30363d;
+  --text: #e6edf3;
+  --dim:  #8b949e;
+  --muted:#484f58;
+  --g:    #3fb950;
+  --r:    #f85149;
+  --y:    #d29922;
+  --blue: #58a6ff;
+  --pur:  #bc8cff;
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,sans-serif;
+     min-height:100vh;display:flex;flex-direction:column;align-items:center;padding:20px 16px 48px;}
+.wrap{width:100%;max-width:960px;}
+
+/* ── Header ── */
+.hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:3px;}
+.logo{font-size:20px;font-weight:700;letter-spacing:4px;color:#fff;text-transform:uppercase;}
+.logo em{color:var(--muted);font-style:normal;font-weight:400;}
+.tagline{color:var(--muted);font-size:11px;margin-bottom:18px;}
+
+/* Status pill */
+.pill{display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:20px;
+      font-size:11px;font-weight:600;border:1px solid;}
+.pill-on {border-color:rgba(63,185,80,.4);color:var(--g);background:rgba(63,185,80,.08);}
+.pill-off{border-color:rgba(248,81,73,.4);color:var(--r);background:rgba(248,81,73,.08);}
+.dot{width:6px;height:6px;border-radius:50%;}
+.dot-on {background:var(--g);box-shadow:0 0 5px var(--g);}
+.dot-off{background:var(--r);}
+
+/* Section label */
+.sec{font-size:10px;text-transform:uppercase;letter-spacing:2px;color:var(--muted);
+     font-weight:600;margin:20px 0 9px;display:flex;align-items:center;justify-content:space-between;}
+
+/* Tool cards */
+.cards{display:grid;grid-template-columns:repeat(4,1fr);gap:9px;}
+@media(max-width:640px){.cards{grid-template-columns:repeat(2,1fr);}}
+.card{background:var(--s1);border:1px solid var(--b);border-radius:10px;padding:13px;
+      text-decoration:none;color:var(--text);display:flex;flex-direction:column;gap:5px;
+      transition:border-color .15s,background .15s;}
+.card:hover{border-color:var(--b2);background:var(--s2);}
+.card .ic{font-size:18px;}
+.card .ttl{font-size:12px;font-weight:600;}
+.card .dsc{color:var(--dim);font-size:10.5px;line-height:1.5;flex:1;}
+.tag{font-size:9px;font-weight:700;letter-spacing:.5px;padding:2px 6px;border-radius:3px;align-self:flex-start;}
+.tag-web{background:rgba(88,166,255,.15);color:var(--blue);}
+.tag-py {background:rgba(63,185,80,.15); color:var(--g);}
+
+/* Control row */
+.ctrl{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:12px;}
+.btn{padding:6px 13px;border-radius:7px;border:none;cursor:pointer;font-size:11.5px;font-weight:600;
+     display:inline-flex;align-items:center;gap:4px;transition:opacity .15s;}
+.btn:disabled{opacity:.4;cursor:default;}
+.btn:not(:disabled):hover{opacity:.82;}
+.btn-run  {background:var(--g);    color:#000;}
+.btn-paper{background:#141d27;     color:var(--blue);border:1px solid var(--b2);}
+.btn-reset{background:#180e0e;     color:var(--r);   border:1px solid rgba(248,81,73,.3);}
+
+/* Stat grid */
+.stats{display:grid;grid-template-columns:repeat(6,1fr);gap:8px;margin-bottom:12px;}
+@media(max-width:600px){.stats{grid-template-columns:repeat(3,1fr);}}
+.stat{background:var(--s1);border:1px solid var(--b);border-radius:8px;padding:9px 11px;}
+.stat .lbl{font-size:10px;color:var(--dim);margin-bottom:3px;}
+.stat .val{font-size:16px;font-weight:700;line-height:1.1;}
+
+/* Market row */
+.mkt{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:12px;}
+@media(max-width:600px){.mkt{grid-template-columns:repeat(2,1fr);}}
+.mkt-c{background:var(--s1);border:1px solid var(--b);border-radius:8px;padding:9px 11px;}
+.mkt-c .ml{font-size:10px;color:var(--dim);margin-bottom:2px;}
+.mkt-c .mv{font-size:13px;font-weight:600;}
+
+/* Signal table */
+.tbl-wrap{background:var(--s1);border:1px solid var(--b);border-radius:8px;
+          overflow:auto;margin-bottom:12px;}
+.tbl-wrap table{width:100%;border-collapse:collapse;font-size:11px;}
+.tbl-wrap th{padding:6px 9px;color:var(--dim);font-weight:500;border-bottom:1px solid var(--b);
+             text-align:left;white-space:nowrap;}
+.tbl-wrap td{padding:4px 9px;border-bottom:1px solid rgba(33,38,45,.5);}
+.tbl-wrap tr:last-child td{border-bottom:none;}
+.tbl-wrap tr:hover td{background:var(--s2);}
+.tbl-empty{padding:12px 14px;color:var(--dim);font-size:11px;}
+
+/* Evolution box */
+.evo{background:var(--s1);border:1px solid var(--b);border-radius:8px;padding:12px;
+     font-size:11px;color:var(--dim);}
+
+/* Run log */
+.runlog{background:var(--s2);border:1px solid var(--b);border-radius:7px;
+        padding:9px;font-family:'Courier New',monospace;font-size:10px;color:var(--dim);
+        max-height:130px;overflow:auto;white-space:pre-wrap;margin-top:10px;}
+
+/* CLI box */
+.cli{background:var(--s1);border:1px solid var(--b);border-radius:8px;padding:12px;
+     display:flex;flex-direction:column;gap:7px;}
+
+/* Alerts */
+.warn{background:rgba(248,81,73,.07);border:1px solid rgba(248,81,73,.25);border-radius:7px;
+      padding:8px 12px;font-size:11px;color:#ffbcb4;}
+.info{background:rgba(63,185,80,.07);border:1px solid rgba(63,185,80,.25);border-radius:7px;
+      padding:8px 12px;font-size:11px;color:#b0ffb4;}
+code{background:var(--s2);border:1px solid var(--b);padding:1px 5px;border-radius:4px;
+     font-family:'Courier New',monospace;font-size:10.5px;color:var(--g);}
+
+.foot{color:var(--muted);font-size:10px;margin-top:28px;text-align:center;line-height:2;}
+
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<!-- Header -->
+<div class="hdr">
+  <div class="logo">SOL <em>/</em> ANALYZER</div>
+  <div class="pill pill-off" id="statusPill">
+    <span class="dot dot-off" id="statusDot"></span>
+    <span id="statusTxt">Offline</span>
+  </div>
+</div>
+<div class="tagline">Self-Learning SMC Bot · Paper Trader · Strategy Evolution</div>
+
+<!-- Tool Cards -->
+<div class="sec">Web-Tools</div>
+<div class="cards">
+  <a class="card" href="trading-suite.html">
+    <div class="ic">◉</div>
+    <div class="ttl">Trading Suite</div>
+    <div class="dsc">Live-Chart, Backtester, KI-Lab, Journal, Signale</div>
+    <span class="tag tag-web">HAUPT-TOOL</span>
+  </a>
+  <a class="card" href="sol-trendline-strategy.html">
+    <div class="ic">↗</div>
+    <div class="ttl">Trendlinien</div>
+    <div class="dsc">Setups: Bounce, Breakout, Wedge, Entscheidungsbaum</div>
+    <span class="tag tag-web">LERNEN</span>
+  </a>
+  <a class="card" href="sol-backtester.html">
+    <div class="ic">⚡</div>
+    <div class="ttl">Backtester</div>
+    <div class="dsc">Trendlinien-Strategie vs. Binance-Daten, Equity-Kurve</div>
+    <span class="tag tag-web">BACKTEST</span>
+  </a>
+  <a class="card" href="blofin-journal.html">
+    <div class="ic">📒</div>
+    <div class="ttl">Blofin Journal</div>
+    <div class="dsc">CSV-Import, Analytics, Kalender, KI-Feedback</div>
+    <span class="tag tag-web">JOURNAL</span>
+  </a>
+</div>
+
+<!-- Live Bot -->
+<div class="sec">
+  <span>Live Bot · Paper Trader</span>
+  <span id="nextRun" style="font-size:10px;color:var(--muted);font-weight:400;
+        text-transform:none;letter-spacing:0;"></span>
+</div>
+
+<div id="offlineHint" class="warn" style="display:none;margin-bottom:10px;">
+  ⚠️ Keine Verbindung. Starte mit <code>.\launch.ps1</code> — dann erscheinen hier Live-Daten.
+</div>
+
+<!-- Buttons -->
+<div class="ctrl">
+  <button id="runBtn"   class="btn btn-run"   disabled>▶ Analysieren</button>
+  <button id="paperBtn" class="btn btn-paper">▶ Paper Start</button>
+  <button id="circuitResetBtn" class="btn btn-reset" style="display:none;">↻ Circuit Reset</button>
+  <span id="newBadge" style="display:none;background:var(--g);color:#000;font-size:10px;
+        font-weight:700;padding:2px 8px;border-radius:10px;animation:pulse 1s 3;">NEU</span>
+</div>
+
+<!-- Stats -->
+<div class="stats">
+  <div class="stat"><div class="lbl">Signale</div>  <div class="val" id="s-total">–</div></div>
+  <div class="stat"><div class="lbl">Win-Rate</div> <div class="val" id="s-wr">–</div></div>
+  <div class="stat"><div class="lbl">W / L</div>    <div class="val" id="s-wl">–</div></div>
+  <div class="stat"><div class="lbl">Offen</div>    <div class="val" id="s-open">–</div></div>
+  <div class="stat"><div class="lbl">Modell</div>   <div class="val" id="s-model">–</div></div>
+  <div class="stat"><div class="lbl">Kosten/Mo</div><div class="val" id="s-cost">–</div></div>
+</div>
+
+<!-- Market Overview -->
+<div class="mkt">
+  <div class="mkt-c"><div class="ml">Marktphase</div>  <div class="mv" id="m-phase">–</div></div>
+  <div class="mkt-c"><div class="ml">Markt-Bias</div>  <div class="mv" id="m-bias">–</div></div>
+  <div class="mkt-c"><div class="ml">Fear &amp; Greed</div><div class="mv" id="m-fg">–</div></div>
+  <div class="mkt-c"><div class="ml">Paper P&amp;L</div><div class="mv" id="m-pnl">–</div></div>
+</div>
+
+<!-- Signal Table -->
+<div style="font-size:11px;font-weight:600;color:var(--dim);margin-bottom:7px;">Letzte Signale</div>
+<div class="tbl-wrap">
+  <div id="sigTable" class="tbl-empty">Lade…</div>
+</div>
+
+<!-- Strategy Evolution -->
+<div style="font-size:11px;font-weight:600;color:var(--dim);margin-bottom:7px;">
+  Strategie-Evolution
+  <span style="font-size:10px;color:var(--muted);font-weight:400;margin-left:6px;">Auto-Update nach jedem Lauf</span>
+</div>
+<div class="evo" id="strategyBox">Lade…</div>
+<div id="runLog" class="runlog" style="display:none;"></div>
+
+<!-- CLI / Python -->
+<div class="sec">CLI-Start</div>
+<div class="cli">
+  <div style="font-size:11.5px;font-weight:600;">Start-Befehle</div>
+  <div style="font-size:11px;color:var(--dim);display:flex;flex-direction:column;gap:5px;">
+    <div>Alles starten (empfohlen): <code>.\launch.ps1</code></div>
+    <div>Nur Bot:    <code>.\start.ps1</code></div>
+    <div>Dashboard:  <code>python learning_dashboard.py</code></div>
+  </div>
+  <div class="info">💡 <code>.\launch.ps1</code> startet Server + Web-Suite + Bot-API gemeinsam.</div>
+  <div class="warn" style="margin-bottom:0;">⚠️ Bot nutzt ausschließlich Claude-Abo (OAuth) — kein API-Key.</div>
+</div>
+
+<div class="foot"><code>.\launch.ps1</code> · Web-Tools + Bot-API + Live-Daten</div>
+
+</div><!-- .wrap -->
+<script>
+const API = (p,o) => fetch(p,o).then(r=>r.json());
+let apiOnline = false;
+
+function setStatus(on){
+  apiOnline=on;
+  document.getElementById('statusPill').className='pill '+(on?'pill-on':'pill-off');
+  document.getElementById('statusDot').className='dot '+(on?'dot-on':'dot-off');
+  document.getElementById('statusTxt').textContent=on?'Online':'Offline';
+  document.getElementById('runBtn').disabled=!on;
+  document.getElementById('offlineHint').style.display=on?'none':'block';
+}
+
+function fmtCost(c){return c==null?'–':'$'+Number(c).toFixed(4);}
+
+function updateStats(sig,model,cost){
+  document.getElementById('s-total').textContent=sig.total??'–';
+  const wr=sig.win_rate;
+  const wrEl=document.getElementById('s-wr');
+  wrEl.textContent=wr==null?'–':wr+'%';
+  wrEl.style.color=wr>=55?'var(--g)':wr>=45?'var(--text)':'var(--r)';
+  document.getElementById('s-wl').textContent=(sig.win??0)+' / '+(sig.loss??0);
+  document.getElementById('s-open').textContent=sig.open??'–';
+  document.getElementById('s-model').textContent=(model&&model.active)?'✅ aktiv':'⏳ Haiku';
+  document.getElementById('s-cost').textContent=fmtCost(cost);
+}
+
+const PHASE_LBL={
+  early_bull:'🌱 Early Bull',mid_bull:'📈 Mid Bull',late_bull:'🚀 Late Bull',
+  distribution:'⚠️ Distribution',bear:'🐻 Bear',unknown:'❓ –'
+};
+
+function updateMarket(analysis,paper){
+  const phase=analysis?.bull_run_phase||'unknown';
+  document.getElementById('m-phase').textContent=PHASE_LBL[phase]||phase;
+
+  const bias=analysis?.market_bias||'–';
+  const biasEl=document.getElementById('m-bias');
+  biasEl.textContent=bias==='bullish'?'📈 Bullish':bias==='bearish'?'📉 Bearish':'➡️ Neutral';
+  biasEl.style.color=bias==='bullish'?'var(--g)':bias==='bearish'?'var(--r)':'var(--dim)';
+
+  const fg=analysis?.fear_greed;
+  const fgEl=document.getElementById('m-fg');
+  fgEl.textContent=fg!=null?fg+' / 100':'–';
+  fgEl.style.color=fg<30?'var(--r)':fg>70?'var(--g)':'var(--text)';
+
+  const pnl=paper?.pnl_pct ?? paper?.total_pnl_pct;
+  const pnlEl=document.getElementById('m-pnl');
+  pnlEl.textContent=pnl!=null?(pnl>=0?'+':'')+Number(pnl).toFixed(2)+'%':'–';
+  pnlEl.style.color=pnl>0?'var(--g)':pnl<0?'var(--r)':'var(--text)';
+}
+
+function renderSignals(rows){
+  const el=document.getElementById('sigTable');
+  if(!rows||!rows.length){el.className='tbl-empty';el.textContent='Noch keine Signale.';return;}
+  el.className='';
+  const head=`<thead><tr>
+    <th>Zeit</th><th>Setup</th><th>Bias</th>
+    <th>Entry</th><th>SL</th><th>TP</th><th>R:R</th><th>Ergebnis</th><th>P&amp;L</th>
+  </tr></thead>`;
+  const body=rows.map(r=>{
+    const oc=r.outcome||'offen';
+    const col=oc==='WIN'?'var(--g)':oc==='LOSS'?'var(--r)':oc==='EXPIRED'?'var(--y)':'var(--dim)';
+    const t=(r.timestamp||'').slice(5,16).replace('T',' ');
+    const rr=(r.risk_pct&&r.reward_pct)?(r.reward_pct/r.risk_pct).toFixed(1)+'R':'–';
+    const pnl=r.pnl_pct==null?'–':Number(r.pnl_pct).toFixed(2)+'%';
+    const pc=r.pnl_pct>0?'var(--g)':r.pnl_pct<0?'var(--r)':'var(--dim)';
+    const bc=r.bias==='bullish'?'var(--g)':'var(--r)';
+    return `<tr>
+      <td>${t}</td>
+      <td>${r.setup_type||'–'}</td>
+      <td style="color:${bc}">${r.bias||'–'}</td>
+      <td>${r.entry_price?'$'+Number(r.entry_price).toFixed(2):'–'}</td>
+      <td style="color:var(--r)">${r.sl_price?'$'+Number(r.sl_price).toFixed(2):'–'}</td>
+      <td style="color:var(--g)">${r.tp_price?'$'+Number(r.tp_price).toFixed(2):'–'}</td>
+      <td>${rr}</td>
+      <td style="color:${col};font-weight:600;">${oc}</td>
+      <td style="color:${pc}">${pnl}</td>
+    </tr>`;
+  }).join('');
+  el.innerHTML=`<table>${head}<tbody>${body}</tbody></table>`;
+}
+
+let _nextSecs=null;
+function _tick(){
+  if(_nextSecs===null)return;
+  _nextSecs=Math.max(0,_nextSecs-1);
+  const h=Math.floor(_nextSecs/3600),m=Math.floor((_nextSecs%3600)/60),s=_nextSecs%60;
+  const txt=h>0?`${h}h ${m}m`:m>0?`${m}m ${s}s`:`${s}s`;
+  const el=document.getElementById('nextRun');
+  if(el)el.textContent=`⏱ nächste Analyse in ${txt}`;
+}
+setInterval(_tick,1000);
+
+function updatePaperBtn(paper){
+  const btn=document.getElementById('paperBtn');
+  if(!paper)return;
+  if(paper.running){btn.textContent='⏸ Paper Stop';btn.style.color='var(--r)';}
+  else            {btn.textContent='▶ Paper Start';btn.style.color='var(--blue)';}
+}
+
+function renderStrategy(data){
+  const el=document.getElementById('strategyBox');if(!el)return;
+  const latest=data.latest||{},history=data.history||[];
+  if(!latest.ts){el.innerHTML='<span style="color:var(--muted)">Kein Lernzyklus — startet nach erstem Analyse-Lauf.</span>';return;}
+  const t=(latest.ts||'').slice(0,16).replace('T',' ');
+  const wr=latest.metrics_after?.win_rate,wrB=latest.metrics_before?.win_rate;
+  const delta=(wr!=null&&wrB!=null)?(wr-wrB).toFixed(1):null;
+  const dCol=delta>=0?'var(--g)':'var(--r)';
+  let html=`<div style="display:flex;justify-content:space-between;align-items:baseline;gap:10px;margin-bottom:7px;">
+    <span style="font-weight:600;color:var(--text)">Letzter Lernzyklus</span>
+    <span style="font-size:10px;color:var(--muted)">${t} UTC</span></div>`;
+  if(delta!==null)
+    html+=`<div style="margin-bottom:5px;">Win-Rate: <b style="color:var(--text)">${wr}%</b>
+      <span style="color:${dCol};margin-left:6px;">${delta>=0?'+':''}${delta}% vs. vorher</span></div>`;
+  if(latest.best_pattern)
+    html+=`<div style="margin-bottom:7px;">🏆 Bestes Muster: ${latest.best_pattern}</div>`;
+  if(latest.actions?.length){
+    html+=`<div style="border-top:1px solid var(--b);padding-top:7px;display:flex;flex-direction:column;gap:3px;">`;
+    latest.actions.forEach(a=>{html+=`<div>• ${a}</div>`;});
+    html+=`</div>`;
+  }
+  if(history.length>1){
+    html+=`<div style="display:flex;gap:5px;flex-wrap:wrap;margin-top:9px;padding-top:7px;border-top:1px solid var(--b);">`;
+    history.slice(0,10).reverse().forEach(h=>{
+      const wr2=h.metrics_after?.win_rate;
+      const col=wr2>=55?'var(--g)':wr2>=45?'var(--text)':'var(--r)';
+      html+=`<div title="${(h.ts||'').slice(5,10)}" style="background:var(--s2);border:1px solid var(--b);
+        border-radius:5px;padding:3px 7px;font-size:10px;color:${col};">${wr2!=null?wr2+'%':'?'}</div>`;
+    });
+    html+=`</div>`;
+  }
+  el.innerHTML=html;
+}
+
+async function loadInitial(){
+  try{
+    const [s,rows,sched,research,paper]=await Promise.all([
+      API('/api/stats'),API('/api/signals?limit=15'),
+      API('/api/schedule'),API('/api/research'),API('/api/paper'),
+    ]);
+    setStatus(true);
+    updateStats(s.signals||{},s.model,s.cost_month);
+    renderSignals(rows);
+    if(sched?.auto&&sched.next_in_secs!=null)_nextSecs=sched.next_in_secs;
+    updateMarket(research?.analysis||{},paper);
+    if(s.circuit_open)document.getElementById('circuitResetBtn').style.display='inline-flex';
+    updatePaperBtn(paper);
+  }catch(e){setStatus(false);}
+}
+
+function connectSSE(){
+  const es=new EventSource('/api/events');
+  es.addEventListener('new_signal',e=>{
+    const d=JSON.parse(e.data);
+    const b=document.getElementById('newBadge');b.style.display='inline';
+    setTimeout(()=>b.style.display='none',4000);
+    if(d.stats)updateStats(d.stats,null,null);
+    API('/api/signals?limit=15').then(renderSignals).catch(()=>{});
+  });
+  es.addEventListener('run_start',()=>{
+    const btn=document.getElementById('runBtn');
+    btn.disabled=true;btn.textContent='⏳ Läuft…';
+    const log=document.getElementById('runLog');
+    log.style.display='block';log.textContent='Analyse gestartet…';
+  });
+  es.addEventListener('strategy_update',e=>{
+    renderStrategy({latest:JSON.parse(e.data),history:[]});
+    API('/api/strategy?n=8').then(renderStrategy).catch(()=>{});
+  });
+  es.addEventListener('run_done',e=>{
+    const d=JSON.parse(e.data);
+    const btn=document.getElementById('runBtn');btn.disabled=false;btn.textContent='▶ Analysieren';
+    const log=document.getElementById('runLog');
+    log.textContent=(d.log||[]).join('\n')||'Fertig.';
+    if(d.error)log.textContent+='\n⚠️ '+d.error;
+    API('/api/stats').then(s=>updateStats(s.signals||{},s.model,s.cost_month)).catch(()=>{});
+    API('/api/signals?limit=15').then(renderSignals).catch(()=>{});
+    API('/api/schedule').then(sc=>{if(sc?.auto&&sc.next_in_secs!=null)_nextSecs=sc.next_in_secs;}).catch(()=>{});
+    Promise.all([API('/api/research'),API('/api/paper')])
+      .then(([r,p])=>updateMarket(r?.analysis||{},p)).catch(()=>{});
+  });
+  es.addEventListener('research_update',e=>{
+    API('/api/paper').then(p=>updateMarket(JSON.parse(e.data),p)).catch(()=>{});
+  });
+  // Paper-Trader live: Trade eröffnet/geschlossen → Paper-P&L + Win-Rate sofort updaten
+  es.addEventListener('paper_update',e=>{
+    try{
+      const p=JSON.parse(e.data||'{}');
+      const pnlEl=document.getElementById('m-pnl');
+      const pnl=p.pnl_pct;
+      if(pnlEl&&pnl!=null){
+        pnlEl.textContent=(pnl>=0?'+':'')+Number(pnl).toFixed(2)+'%';
+        pnlEl.style.color=pnl>0?'var(--g)':pnl<0?'var(--r)':'var(--text)';
+      }
+      // Outcome hat sich geändert → Signal-Stats nachladen
+      API('/api/stats').then(s=>updateStats(s.signals||{},s.model,s.cost_month)).catch(()=>{});
+    }catch(_){}
+  });
+  es.onerror=()=>{es.close();setTimeout(connectSSE,5000);};
+}
+
+document.getElementById('runBtn').addEventListener('click',async()=>{
+  const btn=document.getElementById('runBtn');btn.disabled=true;btn.textContent='⏳ Läuft…';
+  try{await API('/api/run',{method:'POST'});}
+  catch(e){btn.disabled=false;btn.textContent='▶ Analysieren';}
+});
+document.getElementById('paperBtn').addEventListener('click',async()=>{
+  try{const r=await API('/api/paper/toggle',{method:'POST'});updatePaperBtn(r);}catch(e){}
+});
+document.getElementById('circuitResetBtn').addEventListener('click',async()=>{
+  try{await API('/api/circuit-reset',{method:'POST'});
+      document.getElementById('circuitResetBtn').style.display='none';}catch(e){}
+});
+
+loadInitial().then(()=>API('/api/strategy?n=8').then(renderStrategy).catch(()=>{}));
+connectSSE();
+</script>
+</body>
+</html>

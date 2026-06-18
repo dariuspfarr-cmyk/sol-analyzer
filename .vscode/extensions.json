@@ -1,0 +1,13 @@
+{
+  "recommendations": [
+    "ms-python.python",
+    "ms-python.vscode-pylance",
+    "ms-vscode.powershell",
+    "dbaeumer.vscode-eslint",
+    "eamodio.gitlens",
+    "qwtel.sqlite-viewer",
+    "charliermarsh.ruff",
+    "usernamehw.errorlens",
+    "ms-vscode.live-server"
+  ]
+}

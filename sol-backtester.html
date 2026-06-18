@@ -1,0 +1,874 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SOL/USDT Backtester – Trendlinien Strategie</title>
+<style>
+:root {
+  --bg: #0d1117; --surface: #161b22; --surface2: #1c2330;
+  --border: #30363d; --text: #e6edf3; --muted: #8b949e;
+  --green: #3fb950; --red: #f85149; --blue: #58a6ff;
+  --orange: #ff9500; --yellow: #e3b341; --purple: #bc8cff;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', system-ui, sans-serif; font-size: 13px; }
+
+header {
+  background: linear-gradient(135deg,#1a2332,#0d1117);
+  border-bottom: 1px solid var(--border);
+  padding: 14px 24px;
+  display: flex; align-items: center; gap: 14px;
+}
+header .logo { width: 36px; height: 36px; background: linear-gradient(135deg,var(--purple),var(--blue)); border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 18px; font-weight: 700; color: #fff; flex-shrink: 0; }
+header h1 { font-size: 17px; font-weight: 600; }
+header .sub { color: var(--muted); font-size: 12px; }
+header a { margin-left: auto; color: var(--blue); text-decoration: none; font-size: 12px; padding: 5px 12px; border: 1px solid var(--border); border-radius: 6px; }
+header a:hover { background: var(--surface2); }
+
+.config-bar {
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  padding: 12px 24px;
+  display: flex; flex-wrap: wrap; gap: 10px; align-items: center;
+}
+.config-group { display: flex; flex-direction: column; gap: 3px; }
+.config-group label { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: .5px; }
+.config-group select, .config-group input {
+  background: var(--surface2); border: 1px solid var(--border); color: var(--text);
+  padding: 5px 8px; border-radius: 5px; font-size: 12px; width: 100px;
+}
+.config-group select { cursor: pointer; }
+.btn {
+  padding: 7px 20px; border-radius: 6px; border: none; cursor: pointer;
+  font-size: 13px; font-weight: 600; transition: opacity .15s;
+}
+.btn:hover { opacity: .85; }
+.btn-primary { background: var(--blue); color: #000; }
+.btn-green  { background: var(--green); color: #000; }
+.btn-red    { background: var(--red);   color: #fff; }
+.btn:disabled { opacity: .4; cursor: not-allowed; }
+
+.status-bar {
+  padding: 6px 24px;
+  font-size: 11px;
+  display: flex; align-items: center; gap: 8px;
+  border-bottom: 1px solid var(--border);
+  min-height: 30px;
+  background: var(--bg);
+}
+.dot { width: 7px; height: 7px; border-radius: 50%; }
+.dot-idle   { background: var(--muted); }
+.dot-loading{ background: var(--yellow); animation: pulse 1s infinite; }
+.dot-ok     { background: var(--green); }
+.dot-err    { background: var(--red); }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.3} }
+
+.main { padding: 16px 24px; }
+
+.chart-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px;
+  margin-bottom: 14px;
+}
+.chart-title {
+  font-size: 12px; color: var(--muted); margin-bottom: 8px;
+  display: flex; align-items: center; gap: 8px;
+}
+canvas { display: block; width: 100%; cursor: crosshair; }
+
+.metrics {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 10px;
+  margin-bottom: 14px;
+}
+.metric {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px 14px;
+}
+.metric .val { font-size: 20px; font-weight: 700; margin-top: 4px; }
+.metric .lbl { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: .4px; }
+.metric .sub { font-size: 10px; color: var(--muted); margin-top: 2px; }
+
+.trades-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+  margin-bottom: 14px;
+}
+.trades-header {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+  font-weight: 600;
+  display: flex; align-items: center; gap: 10px;
+}
+.trade-table-wrap { overflow-x: auto; max-height: 320px; overflow-y: auto; }
+table { width: 100%; border-collapse: collapse; font-size: 12px; }
+th { position: sticky; top: 0; background: var(--surface2); padding: 7px 12px; text-align: left; color: var(--muted); font-weight: 500; border-bottom: 1px solid var(--border); white-space: nowrap; }
+td { padding: 6px 12px; border-bottom: 1px solid rgba(48,54,61,.4); white-space: nowrap; }
+tr:last-child td { border-bottom: none; }
+tr.win td:first-child { border-left: 2px solid var(--green); }
+tr.loss td:first-child { border-left: 2px solid var(--red); }
+tr:hover td { background: var(--surface2); }
+
+.badge { display: inline-block; padding: 1px 6px; border-radius: 4px; font-size: 10px; font-weight: 600; }
+.badge-tp  { background: rgba(63,185,80,.15);  color: var(--green); }
+.badge-sl  { background: rgba(248,81,73,.15);  color: var(--red); }
+.badge-time{ background: rgba(88,166,255,.15); color: var(--blue); }
+
+.legend-row { display: flex; gap: 14px; flex-wrap: wrap; font-size: 11px; color: var(--muted); }
+.legend-item { display: flex; align-items: center; gap: 5px; }
+.legend-line { width: 18px; height: 2px; }
+
+.placeholder {
+  display: flex; align-items: center; justify-content: center;
+  height: 200px; color: var(--muted); font-size: 14px;
+  flex-direction: column; gap: 8px;
+}
+
+@media(max-width:900px){
+  .metrics { grid-template-columns: repeat(3,1fr); }
+  .config-bar { padding: 10px 16px; }
+  .main { padding: 12px 16px; }
+}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">◎</div>
+  <div>
+    <h1>SOL/USDT Backtester</h1>
+    <div class="sub">Trendlinien Strategie · Echte Binance Daten</div>
+  </div>
+  <a href="sol-trendline-strategy.html">← Strategie</a>
+</header>
+
+<div class="config-bar">
+  <div class="config-group">
+    <label>Intervall</label>
+    <select id="cfgInterval">
+      <option value="4h" selected>4H</option>
+      <option value="1h">1H</option>
+      <option value="1d">Daily</option>
+    </select>
+  </div>
+  <div class="config-group">
+    <label>Kerzen</label>
+    <select id="cfgLimit">
+      <option value="500">500 (~83 Tage)</option>
+      <option value="1000" selected>1000 (~166 Tage)</option>
+      <option value="1500">1500 (~250 Tage)</option>
+    </select>
+  </div>
+  <div class="config-group">
+    <label>Startkapital $</label>
+    <input id="cfgCapital" type="number" value="10000" min="100" step="100">
+  </div>
+  <div class="config-group">
+    <label>Risiko %</label>
+    <input id="cfgRisk" type="number" value="1" min="0.1" max="5" step="0.1">
+  </div>
+  <div class="config-group">
+    <label>SL % unter TL</label>
+    <input id="cfgSL" type="number" value="6" min="2" max="15" step="0.5">
+  </div>
+  <div class="config-group">
+    <label>R:R Ratio</label>
+    <select id="cfgRR">
+      <option value="1.5">1:1.5</option>
+      <option value="2" selected>1:2</option>
+      <option value="2.5">1:2.5</option>
+      <option value="3">1:3</option>
+    </select>
+  </div>
+  <div class="config-group">
+    <label>RSI Min</label>
+    <input id="cfgRSImin" type="number" value="28" min="10" max="50" step="1">
+  </div>
+  <div class="config-group">
+    <label>RSI Max</label>
+    <input id="cfgRSImax" type="number" value="55" min="30" max="70" step="1">
+  </div>
+  <div class="config-group">
+    <label>Pivot Lookback</label>
+    <input id="cfgPivot" type="number" value="3" min="2" max="8" step="1">
+  </div>
+  <button class="btn btn-primary" id="btnRun" onclick="runBacktest()">▶ Backtest starten</button>
+</div>
+
+<div class="status-bar">
+  <div class="dot dot-idle" id="statusDot"></div>
+  <span id="statusText">Bereit – Backtest starten um Daten zu laden</span>
+</div>
+
+<div class="main">
+  <!-- Price Chart -->
+  <div class="chart-card">
+    <div class="chart-title">
+      <span>SOL/USDT 4H · Kerzenchart mit Trendlinien & Signalen</span>
+      <div class="legend-row" id="chartLegend" style="display:none">
+        <div class="legend-item"><div class="legend-line" style="background:#ff9500"></div>EMA 21</div>
+        <div class="legend-item"><div class="legend-line" style="background:#58a6ff"></div>EMA 55</div>
+        <div class="legend-item"><div class="legend-line" style="background:#f85149"></div>EMA 200</div>
+        <div class="legend-item"><div style="width:8px;height:8px;background:#3fb950;border-radius:50%"></div>Long Entry</div>
+        <div class="legend-item"><div style="width:8px;height:8px;background:#58a6ff;border-radius:50%"></div>TP Hit</div>
+        <div class="legend-item"><div style="width:8px;height:8px;background:#f85149;border-radius:50%"></div>SL Hit</div>
+        <div class="legend-item"><div class="legend-line" style="background:#58a6ff;opacity:.6"></div>Trendlinie</div>
+      </div>
+    </div>
+    <div id="priceChartWrap">
+      <div class="placeholder" id="priceChartPlaceholder">
+        <span style="font-size:32px">📈</span>
+        <span>Backtest starten um den Chart zu laden</span>
+      </div>
+    </div>
+    <canvas id="priceChart" style="display:none" height="380"></canvas>
+    <canvas id="volChart"   style="display:none" height="70"></canvas>
+    <canvas id="rsiChart"   style="display:none" height="80"></canvas>
+  </div>
+
+  <!-- Metrics -->
+  <div class="metrics" id="metricsRow">
+    <div class="metric"><div class="lbl">Total Return</div><div class="val" style="color:var(--muted)">—</div></div>
+    <div class="metric"><div class="lbl">Win Rate</div><div class="val" style="color:var(--muted)">—</div></div>
+    <div class="metric"><div class="lbl">Profit Factor</div><div class="val" style="color:var(--muted)">—</div></div>
+    <div class="metric"><div class="lbl">Max Drawdown</div><div class="val" style="color:var(--muted)">—</div></div>
+    <div class="metric"><div class="lbl">Trades</div><div class="val" style="color:var(--muted)">—</div></div>
+    <div class="metric"><div class="lbl">Ø Win</div><div class="val" style="color:var(--muted)">—</div></div>
+    <div class="metric"><div class="lbl">Ø Loss</div><div class="val" style="color:var(--muted)">—</div></div>
+  </div>
+
+  <!-- Equity Curve -->
+  <div class="chart-card">
+    <div class="chart-title">Equity Kurve & Drawdown</div>
+    <div id="equityChartWrap">
+      <div class="placeholder" id="equityPlaceholder">
+        <span style="font-size:28px">💰</span>
+        <span>Equity Kurve erscheint nach dem Backtest</span>
+      </div>
+    </div>
+    <canvas id="equityChart" style="display:none" height="180"></canvas>
+    <canvas id="ddChart"     style="display:none" height="70"></canvas>
+  </div>
+
+  <!-- Trade Log -->
+  <div class="trades-card">
+    <div class="trades-header">
+      Trade Log
+      <span id="tradeCount" style="color:var(--muted);font-size:12px;font-weight:400"></span>
+    </div>
+    <div class="trade-table-wrap">
+      <table id="tradeTable">
+        <thead>
+          <tr>
+            <th>#</th><th>Einstieg Datum</th><th>Ausstieg Datum</th>
+            <th>Entry $</th><th>SL $</th><th>TP $</th><th>Exit $</th>
+            <th>Exit Typ</th><th>P&L %</th><th>P&L $</th><th>Equity $</th>
+            <th>RSI</th>
+          </tr>
+        </thead>
+        <tbody id="tradeBody">
+          <tr><td colspan="12" style="text-align:center;color:var(--muted);padding:24px">Noch keine Trades</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script>
+// ─── State ──────────────────────────────────────────────────────────────────
+let candles = [], trades = [], equityCurve = [], indicators = {};
+let hoveredBar = -1;
+
+// ─── Data Fetching ───────────────────────────────────────────────────────────
+async function fetchData(symbol, interval, limit) {
+  const url = `https://api.binance.com/api/v3/klines?symbol=${symbol}&interval=${interval}&limit=${limit}`;
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const raw = await res.json();
+  return raw.map(k => ({
+    t: k[0], o: +k[1], h: +k[2], l: +k[3], c: +k[4], v: +k[5]
+  }));
+}
+
+// ─── Indicators ──────────────────────────────────────────────────────────────
+function calcEMA(vals, p) {
+  const k = 2 / (p + 1), out = new Array(vals.length);
+  out[0] = vals[0];
+  for (let i = 1; i < vals.length; i++) out[i] = vals[i] * k + out[i-1] * (1-k);
+  return out;
+}
+
+function calcRSI(closes, p = 14) {
+  const out = new Array(closes.length).fill(null);
+  let ag = 0, al = 0;
+  for (let i = 1; i <= p; i++) {
+    const d = closes[i] - closes[i-1];
+    d > 0 ? ag += d : al -= d;
+  }
+  ag /= p; al /= p;
+  out[p] = 100 - 100 / (1 + (al === 0 ? 9999 : ag / al));
+  for (let i = p + 1; i < closes.length; i++) {
+    const d = closes[i] - closes[i-1];
+    ag = (ag * (p-1) + Math.max(d, 0)) / p;
+    al = (al * (p-1) + Math.max(-d, 0)) / p;
+    out[i] = 100 - 100 / (1 + (al === 0 ? 9999 : ag / al));
+  }
+  return out;
+}
+
+function calcSMA(vals, p) {
+  return vals.map((_, i) => {
+    if (i < p - 1) return null;
+    let s = 0; for (let j = i-p+1; j <= i; j++) s += vals[j];
+    return s / p;
+  });
+}
+
+// ─── Pivot Detection ─────────────────────────────────────────────────────────
+function findSwingLows(lows, lb) {
+  const out = [];
+  for (let i = lb; i < lows.length - lb; i++) {
+    let ok = true;
+    for (let j = i-lb; j <= i+lb; j++) {
+      if (j !== i && lows[j] <= lows[i]) { ok = false; break; }
+    }
+    if (ok) out.push(i);
+  }
+  return out;
+}
+
+// ─── Trendline Detection (rolling, no look-ahead) ────────────────────────────
+function getActiveTrendline(candles, idx, pivotLB) {
+  const start = Math.max(0, idx - 120);
+  const pivots = [];
+  for (let i = start + pivotLB; i < idx - pivotLB; i++) {
+    let ok = true;
+    const l = candles[i].l;
+    for (let j = i-pivotLB; j <= i+pivotLB; j++) {
+      if (j !== i && candles[j].l <= l) { ok = false; break; }
+    }
+    if (ok) pivots.push(i);
+  }
+  if (pivots.length < 2) return null;
+
+  // Try most recent pairs first
+  for (let b = pivots.length-1; b >= 1; b--) {
+    for (let a = b-1; a >= 0; a--) {
+      const i = pivots[a], j = pivots[b];
+      if (j - i < 4) continue;
+      if (j < idx - 60) break; // too old
+
+      const y1 = candles[i].l, y2 = candles[j].l;
+      if (y2 <= y1 * 1.003) continue; // must be higher low
+
+      const slope = (y2 - y1) / (j - i);
+      const pctPer10 = slope / y1 * 10;
+      if (pctPer10 < 0.001 || pctPer10 > 0.20) continue; // angle filter
+
+      // Validate: no close below line between i and j
+      let valid = true;
+      for (let k = i+1; k <= j; k++) {
+        const ly = y1 + slope * (k - i);
+        if (candles[k].c < ly * 0.975) { valid = false; break; }
+      }
+      if (!valid) continue;
+      // Validate: no close below from j to now
+      for (let k = j+1; k < idx; k++) {
+        const ly = y1 + slope * (k - i);
+        if (candles[k].c < ly * 0.975) { valid = false; break; }
+      }
+      if (!valid) continue;
+
+      const projY = y1 + slope * (idx - i);
+      return { i, j, y1, slope, projY };
+    }
+  }
+  return null;
+}
+
+// ─── Strategy A: Bounce ──────────────────────────────────────────────────────
+function generateSignals(candles, ema200, rsiArr, pivotLB, rsiMin, rsiMax) {
+  const signals = [];
+  for (let idx = 60; idx < candles.length - 1; idx++) {
+    const tl = getActiveTrendline(candles, idx, pivotLB);
+    if (!tl) continue;
+    const c = candles[idx];
+    const dist = (c.l - tl.projY) / tl.projY;
+    if (dist < -0.015 || dist > 0.03) continue;           // wick touching TL
+    if (c.c <= c.o * 1.001) continue;                     // bullish candle
+    const rsi = rsiArr[idx];
+    if (!rsi || rsi < rsiMin || rsi > rsiMax) continue;   // RSI filter
+    if (c.c < ema200[idx] * 0.94) continue;               // trend filter
+    signals.push({ idx, tl, entry: c.c, rsi });
+  }
+  return signals;
+}
+
+function simulateTrades(candles, signals, slPct, rrRatio, capital, riskPct) {
+  const result = [];
+  let lastExit = -1;
+  let equity = capital;
+
+  for (const sig of signals) {
+    if (sig.idx <= lastExit) continue;
+    const entry = sig.entry;
+    const sl    = sig.tl.projY * (1 - slPct / 100);
+    const risk  = entry - sl;
+    if (risk <= 0 || risk / entry > 0.25) continue;
+    const tp = entry + risk * rrRatio;
+
+    let exitIdx = -1, exitPrice = 0, exitType = 'TIME';
+    for (let k = sig.idx + 1; k < Math.min(sig.idx + 60, candles.length); k++) {
+      if (candles[k].l <= sl) { exitIdx = k; exitPrice = sl; exitType = 'SL'; break; }
+      if (candles[k].h >= tp) { exitIdx = k; exitPrice = tp; exitType = 'TP'; break; }
+    }
+    if (exitIdx < 0) {
+      exitIdx = Math.min(sig.idx + 60, candles.length - 1);
+      exitPrice = candles[exitIdx].c;
+      exitType = 'TIME';
+    }
+    lastExit = exitIdx;
+
+    const riskAmt = equity * (riskPct / 100);
+    const qty     = riskAmt / risk;
+    const pnl     = (exitPrice - entry) * qty;
+    equity += pnl;
+
+    result.push({
+      entryIdx: sig.idx, exitIdx,
+      entry, sl, tp, exit: exitPrice, exitType,
+      pnlPct: (exitPrice - entry) / entry * 100,
+      pnlDollar: pnl,
+      equity,
+      rsi: sig.rsi,
+      tl: sig.tl
+    });
+  }
+  return result;
+}
+
+function buildEquityCurve(capital, trades) {
+  const curve = [capital];
+  for (const t of trades) curve.push(t.equity);
+  return curve;
+}
+
+function calcMetrics(capital, trades, equityCurve) {
+  const wins   = trades.filter(t => t.pnlDollar > 0);
+  const losses = trades.filter(t => t.pnlDollar <= 0);
+  const grossP = wins.reduce((s,t) => s + t.pnlDollar, 0);
+  const grossL = losses.reduce((s,t) => s - t.pnlDollar, 0);
+  let maxDD = 0, peak = capital;
+  for (const v of equityCurve) {
+    if (v > peak) peak = v;
+    const dd = (peak - v) / peak * 100;
+    if (dd > maxDD) maxDD = dd;
+  }
+  const finalEq = equityCurve[equityCurve.length - 1] || capital;
+  return {
+    totalReturn:  (finalEq - capital) / capital * 100,
+    winRate:      trades.length ? wins.length / trades.length * 100 : 0,
+    profitFactor: grossL > 0 ? grossP / grossL : grossP > 0 ? 9.99 : 0,
+    maxDD,
+    total: trades.length, wins: wins.length, losses: losses.length,
+    avgWin:  wins.length   ? grossP / wins.length : 0,
+    avgLoss: losses.length ? grossL / losses.length : 0,
+    finalEq
+  };
+}
+
+// ─── Main Run ─────────────────────────────────────────────────────────────────
+async function runBacktest() {
+  const btn = document.getElementById('btnRun');
+  btn.disabled = true;
+  setStatus('loading', 'Lade SOL/USDT Daten von Binance…');
+
+  try {
+    const interval = document.getElementById('cfgInterval').value;
+    const limit    = +document.getElementById('cfgLimit').value;
+    const capital  = +document.getElementById('cfgCapital').value;
+    const riskPct  = +document.getElementById('cfgRisk').value;
+    const slPct    = +document.getElementById('cfgSL').value;
+    const rrRatio  = +document.getElementById('cfgRR').value;
+    const rsiMin   = +document.getElementById('cfgRSImin').value;
+    const rsiMax   = +document.getElementById('cfgRSImax').value;
+    const pivotLB  = +document.getElementById('cfgPivot').value;
+
+    candles = await fetchData('SOLUSDT', interval, limit);
+    setStatus('loading', `${candles.length} Kerzen geladen – Indikatoren berechnen…`);
+
+    const closes  = candles.map(c => c.c);
+    const vols    = candles.map(c => c.v);
+    const ema21   = calcEMA(closes, 21);
+    const ema55   = calcEMA(closes, 55);
+    const ema200  = calcEMA(closes, 200);
+    const rsiArr  = calcRSI(closes, 14);
+    const volMA   = calcSMA(vols, 20);
+    indicators = { ema21, ema55, ema200, rsiArr, volMA };
+
+    setStatus('loading', 'Generiere Signale…');
+    const signals = generateSignals(candles, ema200, rsiArr, pivotLB, rsiMin, rsiMax);
+
+    trades = simulateTrades(candles, signals, slPct, rrRatio, capital, riskPct);
+    equityCurve = buildEquityCurve(capital, trades);
+    const metrics = calcMetrics(capital, trades, equityCurve);
+
+    updateMetrics(metrics);
+    renderTradeTable(trades);
+    renderCharts(metrics);
+
+    const dateFrom = new Date(candles[0].t).toLocaleDateString('de-DE');
+    const dateTo   = new Date(candles[candles.length-1].t).toLocaleDateString('de-DE');
+    setStatus('ok', `${candles.length} Kerzen (${dateFrom} – ${dateTo}) · ${trades.length} Trades gefunden · Strategie A (Bounce)`);
+  } catch(e) {
+    setStatus('error', 'Fehler: ' + e.message);
+  }
+  btn.disabled = false;
+}
+
+function setStatus(type, msg) {
+  const dot = document.getElementById('statusDot');
+  dot.className = 'dot ' + (type === 'loading' ? 'dot-loading' : type === 'ok' ? 'dot-ok' : type === 'error' ? 'dot-err' : 'dot-idle');
+  document.getElementById('statusText').textContent = msg;
+}
+
+// ─── Metrics UI ───────────────────────────────────────────────────────────────
+function updateMetrics(m) {
+  const row = document.getElementById('metricsRow');
+  const fmt = (v, d=1) => v.toFixed(d);
+  const sign = v => v >= 0 ? '+' : '';
+  const col  = v => v >= 0 ? 'var(--green)' : 'var(--red)';
+
+  row.innerHTML = `
+    <div class="metric"><div class="lbl">Total Return</div>
+      <div class="val" style="color:${col(m.totalReturn)}">${sign(m.totalReturn)}${fmt(m.totalReturn)}%</div>
+      <div class="sub">$${m.finalEq.toFixed(0)}</div></div>
+    <div class="metric"><div class="lbl">Win Rate</div>
+      <div class="val" style="color:${m.winRate>=50?'var(--green)':'var(--red)'}">${fmt(m.winRate)}%</div>
+      <div class="sub">${m.wins}W / ${m.losses}L</div></div>
+    <div class="metric"><div class="lbl">Profit Factor</div>
+      <div class="val" style="color:${m.profitFactor>=1?'var(--green)':'var(--red)'}">${fmt(m.profitFactor,2)}</div>
+      <div class="sub">≥ 1.5 = gut</div></div>
+    <div class="metric"><div class="lbl">Max Drawdown</div>
+      <div class="val" style="color:var(--red)">-${fmt(m.maxDD)}%</div>
+      <div class="sub">Peak to Valley</div></div>
+    <div class="metric"><div class="lbl">Trades</div>
+      <div class="val" style="color:var(--blue)">${m.total}</div>
+      <div class="sub">Strategie A</div></div>
+    <div class="metric"><div class="lbl">Ø Win</div>
+      <div class="val" style="color:var(--green)">+$${m.avgWin.toFixed(0)}</div>
+      <div class="sub">pro Trade</div></div>
+    <div class="metric"><div class="lbl">Ø Loss</div>
+      <div class="val" style="color:var(--red)">-$${m.avgLoss.toFixed(0)}</div>
+      <div class="sub">pro Trade</div></div>`;
+}
+
+// ─── Trade Table ──────────────────────────────────────────────────────────────
+function renderTradeTable(trades) {
+  document.getElementById('tradeCount').textContent = `· ${trades.length} Trades`;
+  const body = document.getElementById('tradeBody');
+  if (!trades.length) {
+    body.innerHTML = '<tr><td colspan="12" style="text-align:center;color:var(--muted);padding:24px">Keine Signale gefunden – Parameter anpassen</td></tr>';
+    return;
+  }
+  const fmt = (v, d=2) => v.toFixed(d);
+  const fmtDate = ts => {
+    const d = new Date(ts);
+    return d.toLocaleDateString('de-DE', {day:'2-digit',month:'2-digit',year:'2-digit'}) + ' ' +
+           d.toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'});
+  };
+  body.innerHTML = trades.map((t, i) => {
+    const win = t.pnlDollar > 0;
+    const badgeCls = t.exitType === 'TP' ? 'badge-tp' : t.exitType === 'SL' ? 'badge-sl' : 'badge-time';
+    return `<tr class="${win?'win':'loss'}">
+      <td>${i+1}</td>
+      <td>${fmtDate(candles[t.entryIdx].t)}</td>
+      <td>${fmtDate(candles[t.exitIdx].t)}</td>
+      <td>$${fmt(t.entry)}</td>
+      <td style="color:var(--red)">$${fmt(t.sl)}</td>
+      <td style="color:var(--green)">$${fmt(t.tp)}</td>
+      <td>$${fmt(t.exit)}</td>
+      <td><span class="badge ${badgeCls}">${t.exitType}</span></td>
+      <td style="color:${win?'var(--green)':'var(--red)'}">${win?'+':''}${fmt(t.pnlPct)}%</td>
+      <td style="color:${win?'var(--green)':'var(--red)'}">${win?'+':''}$${fmt(t.pnlDollar,0)}</td>
+      <td>$${fmt(t.equity,0)}</td>
+      <td style="color:var(--muted)">${fmt(t.rsi,1)}</td>
+    </tr>`;
+  }).join('');
+}
+
+// ─── Charts ───────────────────────────────────────────────────────────────────
+function renderCharts() {
+  document.getElementById('priceChartPlaceholder').style.display = 'none';
+  document.getElementById('equityPlaceholder').style.display = 'none';
+  ['priceChart','volChart','rsiChart','equityChart','ddChart'].forEach(id => {
+    document.getElementById(id).style.display = 'block';
+  });
+  document.getElementById('chartLegend').style.display = 'flex';
+  setTimeout(() => { drawPriceChart(); drawEquityChart(); }, 30);
+}
+
+function drawPriceChart() {
+  const pc = document.getElementById('priceChart');
+  const vc = document.getElementById('volChart');
+  const rc = document.getElementById('rsiChart');
+  const W  = pc.parentElement.clientWidth - 28;
+  [pc, vc, rc].forEach(c => { c.width = W; });
+
+  const H  = pc.height;
+  const VH = vc.height;
+  const RH = rc.height;
+
+  const pad = { l: 14, r: 80, t: 14, b: 6 };
+  const n   = candles.length;
+  const cw  = Math.max(1, Math.floor((W - pad.l - pad.r) / n));
+  const vis = Math.floor((W - pad.l - pad.r) / cw);
+  const startIdx = Math.max(0, n - vis);
+
+  const slice  = candles.slice(startIdx);
+  const pmin   = Math.min(...slice.map(c => c.l)) * 0.99;
+  const pmax   = Math.max(...slice.map(c => c.h)) * 1.01;
+  const vmax   = Math.max(...slice.map(c => c.v));
+
+  const toX  = i => pad.l + (i - startIdx) * cw + cw / 2;
+  const toY  = p => pad.t + (pmax - p) / (pmax - pmin) * (H - pad.t - pad.b);
+  const toVY = v => VH - 2 - (v / vmax) * (VH - 6);
+  const toRY = r => 4 + (100 - r) / 100 * (RH - 8);
+
+  const ctxP  = pc.getContext('2d');
+  const ctxV  = vc.getContext('2d');
+  const ctxR  = rc.getContext('2d');
+
+  // ── Price chart background
+  ctxP.fillStyle = '#161b22'; ctxP.fillRect(0,0,W,H);
+
+  // Grid lines
+  ctxP.strokeStyle = '#30363d30'; ctxP.lineWidth = 1; ctxP.setLineDash([4,4]);
+  for (let i = 0; i <= 4; i++) {
+    const y = pad.t + (H - pad.t - pad.b) * i / 4;
+    ctxP.beginPath(); ctxP.moveTo(pad.l, y); ctxP.lineTo(W - pad.r, y); ctxP.stroke();
+    const pLabel = pmax - (pmax - pmin) * i / 4;
+    ctxP.fillStyle = '#8b949e'; ctxP.font = '9px Segoe UI'; ctxP.textAlign = 'right';
+    ctxP.fillText('$' + pLabel.toFixed(1), W - 5, y + 3);
+  }
+  ctxP.setLineDash([]);
+
+  // Trendlines for active trades
+  const drawnTLs = new Set();
+  for (const t of trades) {
+    if (t.entryIdx < startIdx) continue;
+    const key = `${t.tl.i}-${t.tl.j}`;
+    if (drawnTLs.has(key)) continue;
+    drawnTLs.add(key);
+    const tlEndIdx = Math.min(t.exitIdx + 5, n - 1);
+    const x1 = toX(Math.max(t.tl.i, startIdx));
+    const y1 = toY(t.tl.y1 + t.tl.slope * (Math.max(t.tl.i, startIdx) - t.tl.i));
+    const x2 = toX(tlEndIdx);
+    const y2 = toY(t.tl.y1 + t.tl.slope * (tlEndIdx - t.tl.i));
+    ctxP.strokeStyle = '#58a6ff55'; ctxP.lineWidth = 1.5; ctxP.setLineDash([5,4]);
+    ctxP.beginPath(); ctxP.moveTo(x1,y1); ctxP.lineTo(x2,y2); ctxP.stroke();
+    ctxP.setLineDash([]);
+    // Touch points
+    [t.tl.i, t.tl.j].forEach(pi => {
+      if (pi < startIdx) return;
+      ctxP.beginPath(); ctxP.arc(toX(pi), toY(candles[pi].l), 3, 0, Math.PI*2);
+      ctxP.fillStyle = '#58a6ff60'; ctxP.fill();
+    });
+  }
+
+  // EMAs
+  const emaData = [
+    { arr: indicators.ema21,  color: '#ff950099', label: '21' },
+    { arr: indicators.ema55,  color: '#58a6ff99', label: '55' },
+    { arr: indicators.ema200, color: '#f8514999', label: '200' },
+  ];
+  emaData.forEach(({ arr, color }) => {
+    ctxP.strokeStyle = color; ctxP.lineWidth = 1.2; ctxP.setLineDash([]);
+    ctxP.beginPath();
+    for (let i = startIdx; i < n; i++) {
+      const x = toX(i), y = toY(arr[i]);
+      i === startIdx ? ctxP.moveTo(x,y) : ctxP.lineTo(x,y);
+    }
+    ctxP.stroke();
+  });
+
+  // Candles
+  for (let i = startIdx; i < n; i++) {
+    const c = candles[i];
+    const x = toX(i);
+    const bull = c.c >= c.o;
+    ctxP.strokeStyle = bull ? '#3fb950' : '#f85149';
+    ctxP.fillStyle   = bull ? '#3fb950' : '#f85149';
+    ctxP.lineWidth = 1;
+    ctxP.beginPath(); ctxP.moveTo(x, toY(c.h)); ctxP.lineTo(x, toY(c.l)); ctxP.stroke();
+    const y  = toY(Math.max(c.o, c.c));
+    const bh = Math.max(Math.abs(toY(c.o) - toY(c.c)), 1);
+    ctxP.fillRect(x - cw * .35, y, cw * .7, bh);
+  }
+
+  // Trade markers
+  for (const t of trades) {
+    if (t.entryIdx < startIdx) continue;
+    const ex = toX(t.entryIdx), ey = toY(t.entry);
+    // Entry triangle up
+    ctxP.fillStyle = '#3fb950';
+    ctxP.beginPath(); ctxP.moveTo(ex, ey + 14); ctxP.lineTo(ex-5, ey+22); ctxP.lineTo(ex+5, ey+22); ctxP.closePath(); ctxP.fill();
+
+    if (t.exitIdx >= startIdx) {
+      const xx = toX(t.exitIdx), xy = toY(t.exit);
+      const exitCol = t.exitType === 'TP' ? '#58a6ff' : t.exitType === 'SL' ? '#f85149' : '#e3b341';
+      // Exit circle
+      ctxP.beginPath(); ctxP.arc(xx, xy, 4, 0, Math.PI*2);
+      ctxP.fillStyle = exitCol; ctxP.fill();
+      // Trade line
+      ctxP.strokeStyle = exitCol + '55'; ctxP.lineWidth = 1; ctxP.setLineDash([3,3]);
+      ctxP.beginPath(); ctxP.moveTo(ex, ey); ctxP.lineTo(xx, xy); ctxP.stroke();
+      ctxP.setLineDash([]);
+    }
+  }
+
+  // ── Volume chart
+  ctxV.fillStyle = '#161b22'; ctxV.fillRect(0,0,W,VH);
+  for (let i = startIdx; i < n; i++) {
+    const c = candles[i];
+    const x = toX(i);
+    const bh = VH - 2 - toVY(c.v);
+    ctxV.fillStyle = c.c >= c.o ? '#3fb95055' : '#f8514955';
+    ctxV.fillRect(x - cw*.35, toVY(c.v), cw*.7, bh);
+  }
+  // Vol MA line
+  ctxV.strokeStyle = '#e3b34199'; ctxV.lineWidth = 1.2; ctxV.setLineDash([]);
+  ctxV.beginPath();
+  for (let i = startIdx; i < n; i++) {
+    if (!indicators.volMA[i]) continue;
+    const x = toX(i), y = toVY(indicators.volMA[i]);
+    i === startIdx ? ctxV.moveTo(x,y) : ctxV.lineTo(x,y);
+  }
+  ctxV.stroke();
+
+  // ── RSI chart
+  ctxR.fillStyle = '#161b22'; ctxR.fillRect(0,0,W,RH);
+  // Zones
+  ctxR.globalAlpha = .06;
+  ctxR.fillStyle = '#f85149'; ctxR.fillRect(pad.l, toRY(70), W-pad.l-pad.r, toRY(100)-toRY(70));
+  ctxR.fillStyle = '#3fb950'; ctxR.fillRect(pad.l, toRY(30), W-pad.l-pad.r, toRY(0)-toRY(30));
+  ctxR.fillStyle = '#e3b341'; ctxR.fillRect(pad.l, toRY(55), W-pad.l-pad.r, toRY(35)-toRY(55));
+  ctxR.globalAlpha = 1;
+  // Grid lines
+  [30,35,55,70].forEach(v => {
+    ctxR.strokeStyle = '#30363d60'; ctxR.lineWidth=1; ctxR.setLineDash([3,3]);
+    ctxR.beginPath(); ctxR.moveTo(pad.l,toRY(v)); ctxR.lineTo(W-pad.r,toRY(v)); ctxR.stroke();
+    ctxR.fillStyle='#8b949e'; ctxR.font='8px Segoe UI'; ctxR.textAlign='right';
+    ctxR.fillText(v, W-3, toRY(v)+3);
+  });
+  ctxR.setLineDash([]);
+  // RSI line
+  ctxR.strokeStyle = '#3fb950'; ctxR.lineWidth = 1.5;
+  ctxR.beginPath();
+  for (let i = startIdx; i < n; i++) {
+    if (!indicators.rsiArr[i]) continue;
+    const x = toX(i), y = toRY(indicators.rsiArr[i]);
+    i === startIdx || !indicators.rsiArr[i-1] ? ctxR.moveTo(x,y) : ctxR.lineTo(x,y);
+  }
+  ctxR.stroke();
+  // RSI label
+  ctxR.fillStyle='#3fb950'; ctxR.font='9px Segoe UI'; ctxR.textAlign='left';
+  ctxR.fillText('RSI 14', pad.l+4, 11);
+}
+
+function drawEquityChart() {
+  const ec = document.getElementById('equityChart');
+  const dc = document.getElementById('ddChart');
+  const W  = ec.parentElement.clientWidth - 28;
+  [ec, dc].forEach(c => { c.width = W; });
+  const EH = ec.height, DH = dc.height;
+  const ctxE = ec.getContext('2d'), ctxD = dc.getContext('2d');
+
+  if (equityCurve.length < 2) return;
+
+  const capital = equityCurve[0];
+  const eMin = Math.min(...equityCurve);
+  const eMax = Math.max(...equityCurve);
+  const pad  = { l: 14, r: 80, t: 10, b: 6 };
+  const n    = equityCurve.length;
+  const toX  = i => pad.l + i / (n-1) * (W - pad.l - pad.r);
+  const toEY = v => pad.t + (eMax - v) / (eMax - eMin + 1) * (EH - pad.t - pad.b);
+  const toDY = v => 4 + (v / 100) * (DH - 8);
+
+  // Equity background
+  ctxE.fillStyle = '#161b22'; ctxE.fillRect(0,0,W,EH);
+  // Grid
+  ctxE.strokeStyle='#30363d30'; ctxE.lineWidth=1; ctxE.setLineDash([4,4]);
+  for (let i=0;i<=3;i++) {
+    const y = pad.t + (EH-pad.t-pad.b)*i/3;
+    ctxE.beginPath(); ctxE.moveTo(pad.l,y); ctxE.lineTo(W-pad.r,y); ctxE.stroke();
+    const v = eMax - (eMax-eMin)*i/3;
+    ctxE.fillStyle='#8b949e'; ctxE.font='9px Segoe UI'; ctxE.textAlign='right';
+    ctxE.fillText('$'+v.toFixed(0), W-4, y+3);
+  }
+  ctxE.setLineDash([]);
+  // Capital baseline
+  if (capital >= eMin && capital <= eMax) {
+    const baseY = toEY(capital);
+    ctxE.strokeStyle='#30363d'; ctxE.lineWidth=1; ctxE.setLineDash([4,4]);
+    ctxE.beginPath(); ctxE.moveTo(pad.l,baseY); ctxE.lineTo(W-pad.r,baseY); ctxE.stroke();
+    ctxE.setLineDash([]);
+    ctxE.fillStyle='#8b949e'; ctxE.font='9px Segoe UI'; ctxE.textAlign='right';
+    ctxE.fillText('Start', W-4, baseY-2);
+  }
+  // Equity fill
+  ctxE.beginPath(); ctxE.moveTo(toX(0), toEY(capital));
+  equityCurve.forEach((v,i)=>ctxE.lineTo(toX(i),toEY(v)));
+  ctxE.lineTo(toX(n-1), EH); ctxE.lineTo(toX(0), EH); ctxE.closePath();
+  const grad = ctxE.createLinearGradient(0,pad.t,0,EH);
+  grad.addColorStop(0, '#3fb95040'); grad.addColorStop(1, '#3fb95005');
+  ctxE.fillStyle = grad; ctxE.fill();
+  // Equity line
+  ctxE.strokeStyle='#3fb950'; ctxE.lineWidth=2; ctxE.setLineDash([]);
+  ctxE.beginPath();
+  equityCurve.forEach((v,i)=>{ i===0?ctxE.moveTo(toX(i),toEY(v)):ctxE.lineTo(toX(i),toEY(v)); });
+  ctxE.stroke();
+  // Trade dots
+  equityCurve.forEach((v,i)=>{
+    if (i===0) return;
+    const t = trades[i-1];
+    ctxE.beginPath(); ctxE.arc(toX(i),toEY(v),3,0,Math.PI*2);
+    ctxE.fillStyle = t.pnlDollar>0?'#3fb950':'#f85149'; ctxE.fill();
+  });
+
+  // Drawdown chart
+  ctxD.fillStyle='#161b22'; ctxD.fillRect(0,0,W,DH);
+  const dds = [], peak = [equityCurve[0]];
+  for (let i=0;i<equityCurve.length;i++) {
+    if (i>0) peak.push(Math.max(peak[i-1],equityCurve[i]));
+    dds.push((peak[peak.length-1]-equityCurve[i])/peak[peak.length-1]*100);
+  }
+  ctxD.beginPath(); ctxD.moveTo(toX(0),toDY(0));
+  dds.forEach((d,i)=>ctxD.lineTo(toX(i),toDY(d)));
+  ctxD.lineTo(toX(n-1),toDY(0)); ctxD.lineTo(toX(0),toDY(0)); ctxD.closePath();
+  ctxD.fillStyle='#f8514920'; ctxD.fill();
+  ctxD.strokeStyle='#f85149aa'; ctxD.lineWidth=1.5; ctxD.setLineDash([]);
+  ctxD.beginPath();
+  dds.forEach((d,i)=>{ i===0?ctxD.moveTo(toX(i),toDY(d)):ctxD.lineTo(toX(i),toDY(d)); });
+  ctxD.stroke();
+  ctxD.fillStyle='#f85149'; ctxD.font='9px Segoe UI'; ctxD.textAlign='left';
+  ctxD.fillText('Drawdown %', pad.l+4, 12);
+  const maxDD = Math.max(...dds);
+  ctxD.fillStyle='#8b949e'; ctxD.textAlign='right';
+  ctxD.fillText('Max: -'+maxDD.toFixed(1)+'%', W-4, 12);
+}
+
+window.addEventListener('resize', () => {
+  if (trades.length) { drawPriceChart(); drawEquityChart(); }
+});
+</script>
+</body>
+</html>
