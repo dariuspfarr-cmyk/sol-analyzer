@@ -89,7 +89,7 @@ def _oauth_available() -> bool:
     Claude Code legt OAuth-Token im Benutzerprofil ab.
     """
     from pathlib import Path
-    candidates = [
+    [
         Path.home() / ".claude" / ".credentials.json",
         Path.home() / ".config" / "claude" / "credentials.json",
         Path(os.getenv("APPDATA", "")) / "Claude" / "credentials.json",

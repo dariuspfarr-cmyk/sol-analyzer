@@ -1,0 +1,22 @@
+# Ruff-Konfiguration — Fokus auf echte Bugs, kein Stil-Zwang.
+# So bleibt `ruff check` vertrauenswürdig (jeder Treffer = echtes Problem).
+
+target-version = "py311"
+exclude = [".venv", "node_modules", "charts"]
+line-length = 120
+
+[lint]
+# F  = Pyflakes (undefinierte Namen, kaputte f-Strings, ungenutzte Imports)
+# E9 = Syntaxfehler
+# B  = flake8-bugbear (echte Fallstricke)
+select = ["F", "E9", "B"]
+ignore = [
+  "B007",  # Loop-Variable ungenutzt — meist bewusst (range-Iteration), kein Bug
+  "B905",  # zip() ohne strict= — Längen sind hier abgestimmt, rein stilistisch
+]
+
+[lint.per-file-ignores]
+# Diese Imports sind absichtlich da, um Optional-Dependencies zu erkennen
+# (try/except ImportError) — kein echtes "ungenutzt".
+"dashboard.py"          = ["F401"]
+"local_filter_model.py" = ["F401"]

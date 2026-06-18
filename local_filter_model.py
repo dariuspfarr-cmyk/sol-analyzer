@@ -195,7 +195,7 @@ def train_if_ready() -> Optional[dict]:
 
     status = "✅ Haiku ersetzt" if report["ersetzt_haiku"] else "⚠️  Accuracy zu niedrig"
     print(f"  🧠 Modell trainiert: Accuracy = {accuracy*100:.1f}%  {status}")
-    print(f"     Feature Importance: " +
+    print("     Feature Importance: " +
           ", ".join(f"{k}={v:.3f}" for k, v in
                     sorted(feat_imp.items(), key=lambda x: -x[1])[:4]))
 
@@ -221,7 +221,6 @@ def predict(zones: dict, df, trigger_reason: str, timeframe: str) -> bool:
         if features is None:
             return True
 
-        import numpy as np
         prob    = model.predict_proba([features])[0][1]   # P(WIN)
         min_acc = _get_min_accuracy()
         # Schwellenwert: 0.5 bei minimaler Accuracy, höher bei besserem Modell

@@ -5,10 +5,8 @@ Aufruf:  python dashboard.py
          (aktualisiert automatisch alle 5 Sekunden)
 """
 
-import json
 import time
 from datetime import datetime, timezone
-from pathlib import Path
 
 try:
     from rich.console import Console
@@ -58,7 +56,7 @@ def build_display(status: dict) -> str:
     pf          = status.get("profit_factor", 0)
     dd          = status.get("max_drawdown", 0)
     pos         = status.get("position")
-    weights     = status.get("signal_weights", {})
+    status.get("signal_weights", {})
     recent      = status.get("recent_trades", [])
 
     # ── Header ────────────────────────────────────────────────────
@@ -68,13 +66,13 @@ def build_display(status: dict) -> str:
     ]
 
     # ── Account Stats ─────────────────────────────────────────────
-    lines.append(f"\n[bold]Account[/]")
+    lines.append("\n[bold]Account[/]")
     lines.append(f"  Balance:       [bold]${bal:,.2f}[/]")
     lines.append(f"  P&L:           {_fmt_pnl(pnl)} ({_fmt_pnl(pnl_pct)}%)")
     lines.append(f"  Trades:        {total}  |  Win-Rate: [bold]{wr:.1f}%[/]  |  PF: {pf:.2f}  |  Max DD: [red]{dd:.1f}%[/]")
 
     # ── Offene Position ───────────────────────────────────────────
-    lines.append(f"\n[bold]Offene Position[/]")
+    lines.append("\n[bold]Offene Position[/]")
     if pos:
         d   = pos["direction"].upper()
         col = "[green]" if d == "LONG" else "[red]"
@@ -106,7 +104,7 @@ def build_display(status: dict) -> str:
         lines.append("  [dim]Noch keine geschlossenen Trades[/]")
 
     # ── Signal-Gewichte ───────────────────────────────────────────
-    lines.append(f"\n[bold]Signal-Gewichte (live)[/]")
+    lines.append("\n[bold]Signal-Gewichte (live)[/]")
     for item in learning_engine.get_weight_summary():
         trend = item["trend"]
         delta = item["delta"]

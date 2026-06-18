@@ -11,7 +11,6 @@ Nach jedem Kerzen-Close werden offene Signale automatisch aufgelöst:
 import os
 import sqlite3
 import json
-import re
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
@@ -263,7 +262,7 @@ def log_signal(
     conf_level, conf_score = _calc_confidence(all_triggers, vol_ratio)
 
     # Zone-Position
-    eq    = zones.get("equilibrium", entry)
+    zones.get("equilibrium", entry)
     p_bot = zones.get("premium_bottom", entry * 1.05)
     d_top = zones.get("discount_top",   entry * 0.95)
     if entry >= p_bot:
@@ -460,7 +459,6 @@ def log_backtest_signal(
     Wird NUR vom Backtester aufgerufen — kein API-Call.
     """
     import json as _json
-    from datetime import timezone as _tz
 
     if isinstance(candle_ts, pd.Timestamp):
         ts_str = candle_ts.isoformat()
@@ -473,7 +471,7 @@ def log_backtest_signal(
     conf_level, conf_score = _calc_confidence(all_triggers, vr)
     entry, sl, tp, risk_pct, reward_pct = _derive_sl_tp(zones, bias, timeframe=timeframe)
 
-    eq    = zones.get("equilibrium", entry)
+    zones.get("equilibrium", entry)
     p_bot = zones.get("premium_bottom", entry * 1.05)
     d_top = zones.get("discount_top",   entry * 0.95)
     if entry >= p_bot:

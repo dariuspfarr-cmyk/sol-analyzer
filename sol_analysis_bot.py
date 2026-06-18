@@ -6,7 +6,7 @@
 ╚══════════════════════════════════════════════════════════╝
 """
 
-import os, json, requests, math, io
+import os, requests, io
 from pathlib import Path
 from datetime import datetime, timezone
 from dotenv import load_dotenv
@@ -14,9 +14,6 @@ import pandas as pd
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
-import matplotlib.patches as mpatches
-from matplotlib.patches import FancyBboxPatch
-from PIL import Image, ImageDraw, ImageFont
 
 import cost_tracker
 import signal_logger
@@ -666,7 +663,7 @@ def _run_weekly_if_due() -> None:
                 return
         except Exception:
             pass
-    print(f"\n  ═══ SONNTÄGLICHE OPTIMIERUNG ═══")
+    print("\n  ═══ SONNTÄGLICHE OPTIMIERUNG ═══")
     performance_analyzer.run()
     threshold_optimizer.run()
     try:
@@ -680,7 +677,7 @@ def _run_weekly_if_due() -> None:
         print(f"  ⚠️  routing_report: {e}")
     local_filter_model.train_if_ready()
     _WEEKLY_STAMP.write_text(now.isoformat())
-    print(f"  ═══ Optimierung abgeschlossen ═══\n")
+    print("  ═══ Optimierung abgeschlossen ═══\n")
 
 
 def _send_daily_summary_if_due() -> None:
@@ -699,7 +696,7 @@ def _send_daily_summary_if_due() -> None:
     try:
         smart_router.daily_summary(SYMBOL)
         _DAILY_STAMP.write_text(now.isoformat())
-        print(f"  📅 Tages-Zusammenfassung ausgegeben.")
+        print("  📅 Tages-Zusammenfassung ausgegeben.")
     except Exception as e:
         print(f"  ⚠️  Daily-Summary: {e}")
 

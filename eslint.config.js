@@ -50,6 +50,10 @@ module.exports = [
     rules: {
       ...bugRules,
       "no-undef": "off",
+      // In den Dashboards werden viele Funktionen nur via onclick="" im HTML
+      // aufgerufen → ESLint sieht das nicht und meldet sie faelschlich als
+      // ungenutzt. Daher hier aus, damit nur ECHTE Bug-Funde uebrig bleiben.
+      "no-unused-vars": "off",
     },
   },
 ];

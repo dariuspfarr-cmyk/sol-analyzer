@@ -225,7 +225,7 @@ def run() -> dict:
     Führt alle Research-Abrufe durch, analysiert und cached das Ergebnis.
     Gibt den vollständigen Report zurück.
     """
-    print(f"\n  [Research] Marktdaten abrufen…")
+    print("\n  [Research] Marktdaten abrufen…")
     result = {
         "fetched_at": datetime.now(timezone.utc).isoformat(),
         "sources":    {},

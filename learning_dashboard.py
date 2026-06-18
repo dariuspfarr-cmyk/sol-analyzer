@@ -72,7 +72,7 @@ def show() -> None:
 
     print("\n" + "═" * W)
     print(" " * 18 + "🧠  LEARNING DASHBOARD")
-    print(f" " * 18 + f"SOL/USDT Analyzer · {datetime.now(timezone.utc).strftime('%d.%m.%Y %H:%M')} UTC")
+    print(" " * 18 + f"SOL/USDT Analyzer · {datetime.now(timezone.utc).strftime('%d.%m.%Y %H:%M')} UTC")
     print("═" * W)
 
     # ── Signal-Statistik ─────────────────────────────────────────────────────

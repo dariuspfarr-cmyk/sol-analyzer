@@ -93,7 +93,7 @@ def analyze(
     setup_type, bias, _ = signal_logger._parse_trigger(trigger_reason)
 
     price = zones.get("price_now", 0)
-    eq    = zones.get("equilibrium", price)
+    zones.get("equilibrium", price)
     p_bot = zones.get("premium_bottom", price * 1.05)
     d_top = zones.get("discount_top",   price * 0.95)
 

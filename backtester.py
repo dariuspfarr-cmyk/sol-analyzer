@@ -218,7 +218,7 @@ def _calc_zones(df: pd.DataFrame) -> dict:
 
 # ── Layer-1-Filter (identisch mit should_run_analysis) ────────────────────
 def _layer1(df: pd.DataFrame, zones: dict) -> tuple[bool, str]:
-    close, high, low, vol = (df["close"].values, df["high"].values,
+    _close, high, low, vol = (df["close"].values, df["high"].values,
                               df["low"].values,   df["volume"].values)
     n, price  = len(df), zones["price_now"]
     ph, pl    = zones["pivot_highs"], zones["pivot_lows"]
@@ -382,7 +382,7 @@ def run(force: bool = False) -> None:
     print(f"\n{'═'*58}")
     print(f"  📊  BACKTEST STARTET — {SYMBOL}")
     print(f"  Zeiträume: {', '.join(TIMEFRAMES)}  |  {CANDLES} Kerzen je TF")
-    print(f"  API-Kosten: $0.00 (nur Binance OHLCV, kostenlos)")
+    print("  API-Kosten: $0.00 (nur Binance OHLCV, kostenlos)")
     print(f"{'═'*58}")
 
     all_results: dict[str, dict] = {}
@@ -410,11 +410,11 @@ def run(force: bool = False) -> None:
     _print_summary(all_results)
 
     # Finale Gewichte auf Disk schreiben + vollständige Strategie-Überarbeitung
-    print(f"\n  📚 Backtesting abgeschlossen – starte vollständigen Lernzyklus…")
+    print("\n  📚 Backtesting abgeschlossen – starte vollständigen Lernzyklus…")
     try:
         import strategy_evolver
         strategy_evolver.run(force=True)
-    except Exception as e:
+    except Exception:
         # Fallback: nur backtest_learner
         try:
             import backtest_learner
@@ -425,7 +425,7 @@ def run(force: bool = False) -> None:
 
 def _print_summary(results: dict) -> None:
     print(f"\n{'═'*58}")
-    print(f"  📋  BACKTEST-ZUSAMMENFASSUNG")
+    print("  📋  BACKTEST-ZUSAMMENFASSUNG")
     print(f"{'═'*58}")
 
     # Geschätzte Ersparnis
@@ -458,7 +458,7 @@ def _print_summary(results: dict) -> None:
 
     estimated_ai_cost = total_sigs * (haiku_cost + sonnet_cost * 0.4)
     print(f"\n  💰 Geschätzte AI-Kosten ohne Backtest: ${estimated_ai_cost:.4f}")
-    print(f"  💰 Tatsächliche Backtest-Kosten:         $0.0000")
+    print("  💰 Tatsächliche Backtest-Kosten:         $0.0000")
     print(f"  💰 Ersparnis durch historisches Lernen:  ${estimated_ai_cost:.4f}")
     print(f"{'═'*58}\n")
 
@@ -488,7 +488,6 @@ def should_run_now() -> bool:
     • ≥ NEW_LIVE_TRIGGER neue Live-Signale seit letztem Backtest
       (neue echte Handelsdaten → Backtest-Gewichte neu einarbeiten)
     """
-    from datetime import timedelta
     counts = signal_logger.count()
     if counts["total"] < 200:
         return True

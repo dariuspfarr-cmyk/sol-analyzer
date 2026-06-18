@@ -10,7 +10,6 @@ Maximale Anpassung pro Zyklus: 20% des erlaubten Bereichs (konfigurierbar).
 import json
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
 
 import config as cfg
 
@@ -136,7 +135,7 @@ def _adjust_volume_multiplier(vol_win_rate: float | None,
 
     key     = "VOLUME_SPIKE_MULTIPLIER"
     cur_val = float(current_cfg.get(key, cfg.BOUNDS[key]["default"]))
-    max_d   = cfg.max_delta(key, cur_val)
+    cfg.max_delta(key, cur_val)
 
     if vol_win_rate < VOL_FP_THRESHOLD:
         # Zu viele False Positives durch Volumen-Spike → Schwelle erhöhen
@@ -392,7 +391,7 @@ def _estimate_savings(report: dict, changes: list[str]) -> None:
     """Schätzt und druckt die monatliche Kosteneinsparung durch die Anpassungen."""
     g            = report.get("gesamt", {})
     total_calls  = g.get("api_calls", 0)
-    current_wr   = g.get("api_win_rate_pct", 0)
+    g.get("api_win_rate_pct", 0)
     costs        = report.get("api_kosten_monat_usd", {})
     monthly_cost = sum(costs.values())
 
@@ -401,7 +400,7 @@ def _estimate_savings(report: dict, changes: list[str]) -> None:
     haiku_cost_each  = 0.00006
     savings_est      = saved_calls_est * haiku_cost_each
 
-    print(f"\n  💡 Optimierungs-Einsparungsschätzung:")
+    print("\n  💡 Optimierungs-Einsparungsschätzung:")
     print(f"     Monatliche API-Kosten bisher:  ${monthly_cost:.4f}")
     print(f"     Geschätzte Ersparnis/Monat:    ${savings_est:.4f}")
     print(f"     ({len(changes)} Anpassungen × ~10% weniger unnötige Calls)\n")

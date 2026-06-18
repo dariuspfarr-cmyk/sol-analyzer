@@ -160,14 +160,14 @@ def weekly_report() -> dict:
 
 
 def _print_routing_report(r: dict) -> None:
-    print(f"\n  ── Routing-Report (letzte 7 Tage) ──────────────────")
+    print("\n  ── Routing-Report (letzte 7 Tage) ──────────────────")
     print(f"  Signale gesamt:   {r['gesamt_signale']}")
     print(f"  📊 Algo-Only:     {r['algo_signale']} ({r['algo_quote_pct']:.1f}%)")
     print(f"  🤖 KI-Pipeline:   {r['ai_signale']}")
     print(f"  ✗  Übersprungen:  {r['uebersprungen']}")
     print(f"  💰 KI-Kosten:     ${r['ai_kosten_usd']:.5f}")
     print(f"  💰 Ersparnis:     ${r['gespartes_usd']:.5f} (durch Algo-Only)")
-    print(f"  ───────────────────────────────────────────────────")
+    print("  ───────────────────────────────────────────────────")
 
 
 # ── Tages-Zusammenfassung ─────────────────────────────────────────────────────

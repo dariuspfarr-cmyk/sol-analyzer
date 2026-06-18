@@ -27,7 +27,6 @@ _stop_event = threading.Event()
 import learning_engine
 import signal_logger
 import poi_tracker
-from sol_analysis_bot import calc_smc_zones
 
 # ── Gemeinsame HTTP-Session: Connection-Pooling (keep-alive) + Auto-Retry mit
 #    Backoff bei transienten Fehlern (429/5xx). Spart Verbindungsaufbau im 24/7-
