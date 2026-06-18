@@ -1203,6 +1203,13 @@ def _get_db_signal(state: Optional["State"] = None) -> Optional[dict]:
         if mtf_a is not None and int(float(mtf_a)) <= -2:
             continue
 
+        # Zone-Gate: nacktes Premium/Discount-Zonen-Setup verliert historisch
+        # (~16% WR). Nur traden, wenn die höheren Timeframes die Reversal-Richtung
+        # bestätigen (Alignment ≥ +1) — sonst überspringen.
+        if setup_type == "Zone":
+            if mtf_a is None or int(float(mtf_a)) < 1:
+                continue
+
         # Bull Run Short-Gate: kein Short in early_bull / mid_bull
         try:
             import bull_run_detector as _brd

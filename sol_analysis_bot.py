@@ -394,9 +394,11 @@ def should_run_analysis(df: pd.DataFrame, zones: dict,
                for i in range(len(vals)) for j in range(i + 1, len(vals))):
             triggers.append(f"EQUAL LOWS ~${vals[-1]:.2f}")
 
-    # 4. Premium / Discount Zone — NUR mit Rejection-Bestätigung.
-    #    Das nackte Zone-Setup hatte historisch ~25% WR; eine Ablehnungs-Kerze
-    #    (langer Gegendocht oder Umkehr-Close) filtert die Fehlsignale.
+    # 4. Premium / Discount Zone — NUR mit STARKER Rejection-Bestätigung.
+    #    Frühere Bedingung (Docht ≥0.40 ODER grüne/rote Kerze) war viel zu locker:
+    #    fast jede Kerze in der weiten Zone feuerte → ~16% WR, aktiver Verlust.
+    #    Jetzt: echter langer Gegendocht (≥0.55), Umkehr-Close in Gegenrichtung UND
+    #    Preis tief in der Zone (untere/obere Hälfte) — deutlich seltener, aber valide.
     if n >= 2:
         c_open, c_close = opens[-2], close[-2]
         c_high, c_low   = high[-2], low[-2]
@@ -404,16 +406,19 @@ def should_run_analysis(df: pd.DataFrame, zones: dict,
         lower_wick = (min(c_open, c_close) - c_low)  / c_range
         upper_wick = (c_high - max(c_open, c_close)) / c_range
 
-        if price < zones["discount_top"]:
-            # Bullishe Rejection: langer unterer Docht ODER bullisher Umkehr-Close
-            if lower_wick >= 0.40 or c_close > c_open:
+        disc_mid = zones["discount_bottom"] + (zones["discount_top"] - zones["discount_bottom"]) * 0.5
+        prem_mid = zones["premium_bottom"]  + (zones["premium_top"]  - zones["premium_bottom"])  * 0.5
+
+        if price <= disc_mid:   # tief im Discount-Bereich
+            # Starke bullishe Rejection: langer unterer Docht UND bullisher Close
+            if lower_wick >= 0.55 and c_close > c_open:
                 triggers.append(
-                    f"DISCOUNT ZONE + REJECTION (${price:.2f} ≤ ${zones['discount_top']:.2f})"
+                    f"DISCOUNT ZONE + STARKE REJECTION (${price:.2f} ≤ ${disc_mid:.2f})"
                 )
-        elif price > zones["premium_bottom"]:
-            if upper_wick >= 0.40 or c_close < c_open:
+        elif price >= prem_mid:  # tief im Premium-Bereich
+            if upper_wick >= 0.55 and c_close < c_open:
                 triggers.append(
-                    f"PREMIUM ZONE + REJECTION (${price:.2f} ≥ ${zones['premium_bottom']:.2f})"
+                    f"PREMIUM ZONE + STARKE REJECTION (${price:.2f} ≥ ${prem_mid:.2f})"
                 )
 
     # 5. Volume spike — current candle > vol_mult × 20-period average
