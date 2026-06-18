@@ -17,7 +17,7 @@ const bugRules = {
   "no-unreachable":    "warn",
   "no-cond-assign":    ["error", "always"],
   "no-constant-condition": ["warn", { checkLoops: false }],
-  "no-unused-vars":    ["warn", { args: "none", varsIgnorePattern: "^_" }],
+  "no-unused-vars":    ["warn", { args: "none", caughtErrors: "none", varsIgnorePattern: "^_" }],
   "valid-typeof":      "error",
   "use-isnan":         "error",
 };

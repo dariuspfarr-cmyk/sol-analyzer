@@ -347,7 +347,7 @@ function parseBlofinDate(s) {
 }
 
 function parseBlofinCSV(text) {
-  text = text.replace(/^﻿/, ''); // strip BOM
+  text = text.replace(/^/, ''); // strip BOM
   const lines = text.split(/\r?\n/).filter(l => l.trim());
   if (lines.length < 2) return [];
 
