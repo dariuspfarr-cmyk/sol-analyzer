@@ -168,15 +168,20 @@ def run() -> dict[str, Any]:
         "max_loss_streak":       streak.get("max_loss_streak", 0),
     }
 
-    # API-Effizienz: Calls / echte Wins
-    api_calls = len([s for s in signals if s.get("api_model_used")
-                     and s["api_model_used"] not in ("skipped", "local_model")])
-    wins_from_api = sum(1 for s in signals
-                        if s.get("outcome") == "WIN"
-                        and s.get("api_model_used") not in ("skipped", "local_model"))
-    api_efficiency = round(wins_from_api / api_calls * 100, 2) if api_calls else 0.0
+    # API-Signale: echte Win-Rate (nur GESCHLOSSENE) vs. Kosten-Ausbeute (pro Call).
+    # Wichtig: die Win-Rate muss über WIN+LOSS gehen — offene/abgelaufene Signale
+    # im Nenner verfälschen sie zu einer "Wins-pro-Call"-Ausbeute (≠ Win-Rate).
+    def _is_api(s):
+        return s.get("api_model_used") and s["api_model_used"] not in ("skipped", "local_model")
+    api_calls   = len([s for s in signals if _is_api(s)])
+    api_closed  = [s for s in signals if _is_api(s) and s.get("outcome") in ("WIN", "LOSS")]
+    wins_from_api = sum(1 for s in api_closed if s["outcome"] == "WIN")
+    api_win_rate = round(wins_from_api / len(api_closed) * 100, 2) if api_closed else 0.0
+    api_yield    = round(wins_from_api / api_calls * 100, 2) if api_calls else 0.0
     overall["api_calls"]           = api_calls
-    overall["api_win_rate_pct"]    = api_efficiency
+    overall["api_closed"]          = len(api_closed)
+    overall["api_win_rate_pct"]    = api_win_rate
+    overall["api_win_yield_pct"]   = api_yield   # Wins pro Call (Kosten-Effizienz)
     overall["local_model_calls"]   = sum(1 for s in signals
                                          if s.get("api_model_used") == "local_model")
     overall["api_calls_saved"]     = overall["local_model_calls"]
@@ -263,7 +268,8 @@ def _print_summary(r: dict) -> None:
     streak_str = (f"🔥 +{streak} Wins" if streak > 0 else f"⛔ {streak} Losses" if streak < 0 else "neutral")
     print(f"  Streak:          {streak_str}  "
           f"(max Loss-Streak: {g.get('max_loss_streak',0)})")
-    print(f"  API-Calls:       {g['api_calls']}  →  Win-Rate: {g['api_win_rate_pct']:.1f}%")
+    print(f"  API-Calls:       {g['api_calls']}  →  Win-Rate (geschlossen): "
+          f"{g['api_win_rate_pct']:.1f}%  ·  Wins/Call: {g.get('api_win_yield_pct', 0):.1f}%")
     print(f"  Gespartes Haiku: {saved} Calls ≈ ${saved * haiku_price_per_call:.4f}")
     print(f"  Monatliche Kosten: ${total_cost:.4f}")
 

@@ -195,13 +195,16 @@ def scan_trading() -> list[dict]:
                 "performance_report.json", key="loss_streak",
             ))
 
-        # KI-Signal-Qualität
+        # KI-Signal-Qualität — echte Win-Rate über GESCHLOSSENE API-Trades
+        # (api_win_rate_pct ist jetzt closed-basiert; api_closed als Signifikanz-Gate)
         awr = g.get("api_win_rate_pct")
-        if awr is not None and awr < 55 and g.get("api_calls", 0) >= 50:
+        api_closed = g.get("api_closed", g.get("api_calls", 0))
+        if awr is not None and awr < 55 and api_closed >= 50:
             out.append(_finding(
                 "trading", "P3",
                 f"KI-Signale kaum besser als Zufall (WR {awr:.0f}%)",
-                f"API-bestätigte Signale: Win-Rate {awr:.1f}% bei {g.get('api_calls')} Calls.",
+                f"API-bestätigte Signale: Win-Rate {awr:.1f}% bei {api_closed} "
+                f"geschlossenen Trades.",
                 "smart_router-Schwellen / Layer-2-Prompt prüfen — die KI-Bestätigung "
                 "sollte deutlich über 55% liegen, sonst lohnt der API-Call nicht.",
                 "performance_report.json", key="weak_ai_wr",
