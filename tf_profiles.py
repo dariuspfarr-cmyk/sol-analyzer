@@ -19,6 +19,10 @@ from __future__ import annotations
 # sl_buffer_pct: SL-Puffer unter/über Sweep/OB-Level — Basis, ATR überschreibt
 # min_sl_pct:    minimale SL-Distanz vom Entry (Clamp) — vorher fix 3% überall
 # max_tp_pct:    minimale TP-Distanz (Clamp-Gegenstück)
+# max_risk_pct:  MAXIMALE SL-Distanz vom Entry — Setups mit weiterem strukturellem
+#                Stop sind nicht handelbar (Preis erreicht SL/TP nie im Tracking-
+#                Fenster → Signal läuft ab statt zu schließen). Verhindert z. B.
+#                1d-EQH-Signale mit 24% Stop, die ewig offen bleiben.
 # min_rr:        Mindest-RR für gültiges Setup auf diesem TF (LTF = mehr Rauschen
 #                → höhere Anforderung)
 # choch_win:     Fenster für CHoCH-Trigger-Erkennung
@@ -30,35 +34,43 @@ from __future__ import annotations
 #                festsitzende Positionen, die Slots und Lernen blockieren)
 PROFILES: dict[str, dict] = {
     "1m":  {"swing_window": 3, "eqh_tol": 0.0010, "sl_buffer_pct": 0.0015,
-            "min_sl_pct": 0.004, "min_tp_pct": 0.006, "min_rr": 2.5,
+            "min_sl_pct": 0.004, "min_tp_pct": 0.006, "max_risk_pct": 0.025,
+            "min_rr": 2.5,
             "choch_win": 14, "vol_mult": 2.8, "bos_recency": 3,
             "signal_max_age_h": 0.5, "max_hold_hours": 4},
     "5m":  {"swing_window": 4, "eqh_tol": 0.0012, "sl_buffer_pct": 0.0020,
-            "min_sl_pct": 0.005, "min_tp_pct": 0.008, "min_rr": 2.3,
+            "min_sl_pct": 0.005, "min_tp_pct": 0.008, "max_risk_pct": 0.030,
+            "min_rr": 2.3,
             "choch_win": 12, "vol_mult": 2.6, "bos_recency": 3,
             "signal_max_age_h": 1.0, "max_hold_hours": 8},
     "15m": {"swing_window": 4, "eqh_tol": 0.0015, "sl_buffer_pct": 0.0025,
-            "min_sl_pct": 0.008, "min_tp_pct": 0.012, "min_rr": 2.2,
+            "min_sl_pct": 0.008, "min_tp_pct": 0.012, "max_risk_pct": 0.040,
+            "min_rr": 2.2,
             "choch_win": 12, "vol_mult": 2.4, "bos_recency": 3,
             "signal_max_age_h": 2.0, "max_hold_hours": 12},
     "30m": {"swing_window": 5, "eqh_tol": 0.0018, "sl_buffer_pct": 0.0030,
-            "min_sl_pct": 0.010, "min_tp_pct": 0.016, "min_rr": 2.1,
+            "min_sl_pct": 0.010, "min_tp_pct": 0.016, "max_risk_pct": 0.050,
+            "min_rr": 2.1,
             "choch_win": 11, "vol_mult": 2.2, "bos_recency": 3,
             "signal_max_age_h": 4.0, "max_hold_hours": 24},
     "1h":  {"swing_window": 5, "eqh_tol": 0.0020, "sl_buffer_pct": 0.0035,
-            "min_sl_pct": 0.013, "min_tp_pct": 0.020, "min_rr": 2.0,
+            "min_sl_pct": 0.013, "min_tp_pct": 0.020, "max_risk_pct": 0.060,
+            "min_rr": 2.0,
             "choch_win": 10, "vol_mult": 2.1, "bos_recency": 3,
             "signal_max_age_h": 6.0, "max_hold_hours": 48},
     "4h":  {"swing_window": 5, "eqh_tol": 0.0025, "sl_buffer_pct": 0.0045,
-            "min_sl_pct": 0.030, "min_tp_pct": 0.030, "min_rr": 2.0,
+            "min_sl_pct": 0.030, "min_tp_pct": 0.030, "max_risk_pct": 0.090,
+            "min_rr": 2.0,
             "choch_win": 10, "vol_mult": 2.0, "bos_recency": 2,
             "signal_max_age_h": 8.0, "max_hold_hours": 168},
     "1d":  {"swing_window": 6, "eqh_tol": 0.0040, "sl_buffer_pct": 0.0080,
-            "min_sl_pct": 0.050, "min_tp_pct": 0.050, "min_rr": 1.8,
+            "min_sl_pct": 0.050, "min_tp_pct": 0.050, "max_risk_pct": 0.120,
+            "min_rr": 1.8,
             "choch_win": 8,  "vol_mult": 1.8, "bos_recency": 2,
             "signal_max_age_h": 48.0, "max_hold_hours": 720},
     "1w":  {"swing_window": 6, "eqh_tol": 0.0060, "sl_buffer_pct": 0.0120,
-            "min_sl_pct": 0.080, "min_tp_pct": 0.080, "min_rr": 1.6,
+            "min_sl_pct": 0.080, "min_tp_pct": 0.080, "max_risk_pct": 0.200,
+            "min_rr": 1.6,
             "choch_win": 8,  "vol_mult": 1.6, "bos_recency": 2,
             "signal_max_age_h": 168.0, "max_hold_hours": 2160},
 }
@@ -115,3 +127,14 @@ def sl_tp_clamps(timeframe: str, price: float, atr: float = 0.0) -> tuple[float,
 def min_rr(timeframe: str) -> float:
     """Mindest-RR für ein gültiges Setup auf diesem Timeframe."""
     return get(timeframe)["min_rr"]
+
+
+def max_risk_pct(timeframe: str) -> float:
+    """
+    Maximale handelbare SL-Distanz (Anteil vom Entry) für diesen Timeframe.
+    Setups mit weiterem strukturellem Stop sind nicht handelbar — der Preis
+    erreicht SL/TP nie im Tracking-Fenster und das Signal läuft nur ab.
+    Unbekannte TFs nutzen das 4h-Profil (get-Fallback); 0.12 nur falls der
+    Schlüssel im Profil fehlt.
+    """
+    return get(timeframe).get("max_risk_pct", 0.12)

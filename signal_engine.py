@@ -782,6 +782,17 @@ def analyze(df: pd.DataFrame, zones: dict,
     entry, sl, tp = _calc_entry_sl_tp(price, bias, confluence, zones, timeframe)
     rr = abs(tp - entry) / max(abs(entry - sl), 0.001)
 
+    # Max-Risiko pro Timeframe: struktureller Stop zu weit → nicht handelbar
+    # (Preis erreicht SL/TP nie im Tracking-Fenster, Signal läuft nur ab).
+    risk_pct = abs(entry - sl) / max(entry, 1e-9)
+    if risk_pct > tf_profiles.max_risk_pct(timeframe):
+        return SignalResult(
+            timestamp=now, bias="neutral", score=confluence.score,
+            triggers=confluence.triggers, zone=zone_pos,
+            entry=entry, sl=sl, tp=tp, rr=round(rr, 2),
+            htf_bias=htf_bias, confluence=confluence,
+        )
+
     # Mindest-RR pro Timeframe (LTF = mehr Rauschen → strenger)
     if rr < tf_profiles.min_rr(timeframe):
         return SignalResult(

@@ -785,6 +785,24 @@ def main():
 
         # MTF-Alignment dieses Signals (HTF-Trends vs. Signal-Bias)
         _, sig_bias, _ = signal_logger._parse_trigger(reason)
+
+        # Nicht handelbare Setups (struktureller Stop zu weit) gar nicht erst
+        # routen/loggen — Preis erreicht SL/TP nie im Tracking-Fenster, das
+        # Signal läuft nur ab (z. B. 1d-EQH mit ~24% Stop). 1d bleibt als
+        # HTF-Bias/MTF-Kontext erhalten, nur als TRADE-Signal wird es verworfen.
+        try:
+            import tf_profiles as _tfp
+            _rp = signal_logger._derive_sl_tp(
+                zones, sig_bias, timeframe=tf,
+                atr_pct=zones.get("atr_pct", 0.0))[3]
+            if _rp / 100.0 > _tfp.max_risk_pct(tf):
+                print(f"     ✗ Risiko {_rp:.1f}% > Max "
+                      f"{_tfp.max_risk_pct(tf) * 100:.0f}% für {tf} – "
+                      f"nicht handelbar, übersprungen.")
+                continue
+        except Exception:
+            pass
+
         align = mtf_analyzer.alignment_score(tf, sig_bias, trends)
         align_str = f"+{align}" if align > 0 else str(align)
         print(f"\n  ── {tf}: {reason[:70]}")
