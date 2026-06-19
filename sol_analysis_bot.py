@@ -715,14 +715,22 @@ def _fill_demand_zones(zones: dict) -> None:
         zones["demand_zones"].append((p - offset - p * 0.01, p - offset))
 
 
-def _set_signal_meta(sig_id: int, mtf_alignment: int) -> None:
-    """Schreibt das MTF-Alignment nachträglich auf ein geloggtes Signal."""
+def _set_signal_meta(sig_id: int, mtf_alignment: int, adx: float = None) -> None:
+    """Schreibt MTF-Alignment (und optional ADX) nachträglich auf ein Signal.
+
+    ADX-Erfassung schließt eine Pipeline-Lücke: adx_at_signal war bislang NULL,
+    wodurch Regime-Filter und das ADX-Bucket-Lernen blind liefen.
+    """
     if not sig_id or sig_id < 0:
         return
     try:
         conn = signal_logger._conn()
-        conn.execute("UPDATE signals SET mtf_alignment=? WHERE id=?",
-                     (int(mtf_alignment), sig_id))
+        if adx is not None and adx > 0:
+            conn.execute("UPDATE signals SET mtf_alignment=?, adx_at_signal=? WHERE id=?",
+                         (int(mtf_alignment), round(float(adx), 2), sig_id))
+        else:
+            conn.execute("UPDATE signals SET mtf_alignment=? WHERE id=?",
+                         (int(mtf_alignment), sig_id))
         conn.commit()
     except Exception:
         pass
@@ -784,7 +792,7 @@ def main():
         _fill_demand_zones(zones)
 
         # MTF-Alignment dieses Signals (HTF-Trends vs. Signal-Bias)
-        _, sig_bias, _ = signal_logger._parse_trigger(reason)
+        _setup_t, sig_bias, _ = signal_logger._parse_trigger(reason)
 
         # Nicht handelbare Setups (struktureller Stop zu weit) gar nicht erst
         # routen/loggen — Preis erreicht SL/TP nie im Tracking-Fenster, das
@@ -809,6 +817,25 @@ def main():
         print(f"     MTF-Alignment: {align_str} (HTF-Trends: "
               + ", ".join(f"{k}={v}" for k, v in trends.items() if k != tf) + ")")
 
+        # Trend-Stärke einmal berechnen (für Regime-Filter + ADX-Erfassung)
+        try:
+            from pt_indicators import calc_adx as _calc_adx
+            _adx = _calc_adx(df)
+        except Exception:
+            _adx = 0.0
+
+        # ── Regime-Filter: Reversals im Trend nur trend-konform emittieren ────
+        # SMC-Grundregel: Reversal-Setups (EQH/EQL/Zone) wirken in RANGES, nicht
+        # im Trend. In einem Trend (ADX ≥ 25) verlieren sie, sobald sie NICHT mit
+        # dem Trend laufen — die jüngsten ~86% Verluste sind genau das. align > 0
+        # ist die VERLÄSSLICHE Trend-Bestätigung (wird gesetzt, wenn HTF-Trends das
+        # Signal stützen); align ≤ 0 (neutral/gegen) im Trend → nicht emittieren.
+        # In Ranges (ADX < 25) bleiben Reversals frei. HAUPTZIEL: nur A+-Setups.
+        if _setup_t in ("EQH", "EQL", "Zone") and align <= 0 and _adx >= 25:
+            print(f"     ✗ Regime: {_setup_t} nicht trend-konform (MTF {align}) "
+                  f"bei ADX {_adx:.0f} – Reversal im Trend, übersprungen.")
+            continue
+
         # ── SMART ROUTER pro Timeframe ───────────────────────────────
         routing, algo_score, samples, win_rate_pct = smart_router.route(
             zones, df, reason, tf
@@ -823,7 +850,7 @@ def main():
                 print(f"     ↓ KI-Budget verbraucht → Algo-Pfad für {tf}")
             result = _ae.process_signal(zones, df, reason, tf)
             if result.get("signal_id"):
-                _set_signal_meta(result["signal_id"], align)
+                _set_signal_meta(result["signal_id"], align, _adx)
             continue
 
         # ── routing == "ai" → KI-Pipeline (einmal pro Lauf) ──────────
@@ -838,8 +865,9 @@ def main():
         )
         try:
             _c = signal_logger._conn()
-            _c.execute("UPDATE signals SET algo_score=?, routing=? WHERE id=?",
-                       (float(algo_score), "ai", _current_signal_id))
+            _c.execute("UPDATE signals SET algo_score=?, routing=?, adx_at_signal=? WHERE id=?",
+                       (float(algo_score), "ai", round(float(_adx), 2) if _adx > 0 else None,
+                        _current_signal_id))
             _c.commit()
         except Exception:
             pass
