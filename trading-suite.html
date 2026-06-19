@@ -4637,6 +4637,16 @@ class LiveChart {
     this.dragStartX  = 0;
     this.dragStartOff= 0;
 
+    // ── Dynamik / Animation (requestAnimationFrame-Loop) ─────────
+    this._raf       = null;  // aktiver rAF-Handle
+    this._animLo    = null;  // geglättete Y-Achse (eased) für weiches Skalieren
+    this._animHi    = null;
+    this._animPrice = null;  // geglätteter Live-Preis (gleitende Preislinie)
+    this._pulse     = 0;     // Phase für pulsierenden Live-Punkt
+    this._lastTs    = 0;
+    this._visible   = true;  // Tab sichtbar → Loop läuft
+    this._dirty     = true;
+
     // Panels: [height ratio]
     this.PH = { price:0.54, vol:0.08, rsi:0.13, macd:0.18 };
     this.P_RIGHT  = 72;
@@ -4782,8 +4792,69 @@ class LiveChart {
   toX(i)       { return this.P_TOP/2 + (i-this.startI)*this.candleW + this.candleW*0.5; }
   toY(p,y0,ph,lo,hi) { return y0 + (1-(p-lo)/(hi-lo))*ph; }
 
+  // Öffentliche API: markiert Neuzeichnen und stellt sicher, dass die
+  // Animationsschleife läuft. Alle bisherigen render()-Aufrufer bleiben gültig.
   render() {
-    if (!this.W) { setTimeout(()=>this.render(),50); return; }
+    this._dirty = true;
+    this._ensureLoop();
+  }
+
+  _ensureLoop() {
+    if (this._raf == null && this._visible) {
+      this._lastTs = performance.now();
+      this._raf = requestAnimationFrame(ts => this._loop(ts));
+    }
+  }
+
+  // Tab-Sichtbarkeit: pausiert die Schleife im Hintergrund (spart CPU).
+  setVisible(v) {
+    this._visible = !!v;
+    if (this._visible) this._ensureLoop();
+    else if (this._raf != null) { cancelAnimationFrame(this._raf); this._raf = null; }
+  }
+
+  _loop(ts) {
+    this._raf = null;
+    // Nicht sichtbar (Tab/Pane verborgen) → pausieren; nächster render()-Aufruf
+    // (z. B. per Live-Tick) startet die Schleife wieder.
+    if (!this._visible || this.el.offsetParent === null) return;
+    const dt = Math.min(0.05, Math.max(0.0001, (ts - this._lastTs) / 1000));
+    this._lastTs = ts;
+    this._pulse += dt;
+
+    let settled = true;
+    const vc = this.visC;
+    if (vc.length) {
+      const tgt = this._priceRange(vc);
+      // Framerate-unabhängige Dämpfung (~0.18 pro 16 ms) → weiches Skalieren/Pannen
+      const k = 1 - Math.pow(0.0008, dt);
+      if (this._animLo == null) { this._animLo = tgt.lo; this._animHi = tgt.hi; }
+      else {
+        this._animLo += (tgt.lo - this._animLo) * k;
+        this._animHi += (tgt.hi - this._animHi) * k;
+      }
+      const last = this.candles[this.candles.length-1];
+      if (last) {
+        if (this._animPrice == null) this._animPrice = last.c;
+        else this._animPrice += (last.c - this._animPrice) * k;
+        if (Math.abs(last.c - this._animPrice) > Math.max(1e-6, last.c*1e-5)) settled = false;
+      }
+      const eps = (tgt.hi - tgt.lo) * 2e-4;
+      if (Math.abs(tgt.lo - this._animLo) > eps || Math.abs(tgt.hi - this._animHi) > eps) settled = false;
+    }
+
+    this._draw();
+    this._dirty = false;
+
+    // Weiterlaufen, solange sichtbar & Kerzen da sind: hält den pulsierenden
+    // Live-Punkt und die geglättete Skala dauerhaft lebendig (maximal dynamisch).
+    if (this._visible && (this.candles.length > 0 || !settled || this._dirty)) {
+      this._raf = requestAnimationFrame(t => this._loop(t));
+    }
+  }
+
+  _draw() {
+    if (!this.W) return;
     const ctx=this.ctx, W=this.W, H=this.H;
     // Clear
     ctx.fillStyle=this.C.bg; ctx.fillRect(0,0,W,H);
@@ -4791,7 +4862,10 @@ class LiveChart {
     const vc = this.visC;
     if (!vc.length) { ctx.fillStyle=this.C.text; ctx.font='13px Segoe UI'; ctx.textAlign='center'; ctx.fillText('Lade Daten…',W/2,H/2); return; }
 
-    const pr  = this._priceRange(vc);
+    // Geglättete (animierte) Y-Achse statt harter Sprünge
+    const pr  = (this._animLo!=null && this._animHi!=null)
+      ? { lo:this._animLo, hi:this._animHi }
+      : this._priceRange(vc);
     const pY0 = this.P_TOP, pH = this.CH*this.PH.price;
     const vY0 = pY0+pH+1,   vH = this.CH*this.PH.vol;
     const rY0 = vY0+vH+1,   rH = this.CH*this.PH.rsi;
@@ -5515,16 +5589,28 @@ class LiveChart {
     const ctx=this.ctx, {lo,hi}=pr;
     if (!this.candles.length) return;
     const last=this.candles[this.candles.length-1];
-    const y=this.toY(last.c,y0,ph,lo,hi);
+    // Geglätteter Live-Preis → Linie & Label gleiten weich mit jedem Tick
+    const price = this._animPrice!=null ? this._animPrice : last.c;
+    const y=this.toY(price,y0,ph,lo,hi);
     const up=last.c>=last.o, col=up?this.C.up:this.C.dn;
     ctx.strokeStyle=col+'66'; ctx.lineWidth=1; ctx.setLineDash([4,3]);
     ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(this.CW,y); ctx.stroke();
     ctx.setLineDash([]);
+    // Pulsierender Live-Punkt am rechten Rand (zeigt: Daten sind live)
+    const pulse = 0.5 + 0.5*Math.sin(this._pulse*Math.PI*1.6);
+    const dotX = this.CW - 1;
+    ctx.save();
+    ctx.globalAlpha = 0.16 + 0.24*pulse;
+    ctx.fillStyle = col;
+    ctx.beginPath(); ctx.arc(dotX, y, 6 + 5*pulse, 0, Math.PI*2); ctx.fill();
+    ctx.globalAlpha = 1;
+    ctx.beginPath(); ctx.arc(dotX, y, 3, 0, Math.PI*2); ctx.fill();
+    ctx.restore();
     // Price label
     const lh=16;
     ctx.fillStyle=col; ctx.fillRect(this.CW,y-lh/2,this.P_RIGHT,lh);
     ctx.fillStyle='#fff'; ctx.font='bold 11px Courier New'; ctx.textAlign='left';
-    ctx.fillText('$'+last.c.toFixed(2), this.CW+5, y+4);
+    ctx.fillText('$'+price.toFixed(2), this.CW+5, y+4);
   }
 
   _drawCrosshair(pr,y0,ph,vy0,vh,ry0,rh,my0,mh) {
@@ -5962,6 +6048,8 @@ class LiveChart {
 
   setCandles(candles) {
     this.candles = candles;
+    // Animation auf neuen Datensatz schnappen (kein Easing aus altem Bereich)
+    this._animLo = this._animHi = this._animPrice = null;
     this._computeIndicators();
     this._computeTLs();
     this.render();
@@ -6614,7 +6702,9 @@ function lvInit() {
   _lvLoadResearch();   // load market intelligence
   // Reconnect when tab becomes visible again
   document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'visible' && lvDM) {
+    const vis = document.visibilityState === 'visible';
+    if (lvChart) lvChart.setVisible(vis);   // Animationsschleife im Hintergrund pausieren
+    if (vis && lvDM) {
       const ws = lvDM.ws;
       if (!ws || ws.readyState === WebSocket.CLOSED || ws.readyState === WebSocket.CLOSING) {
         lvDM._retryDelay = 1500;
