@@ -1,6 +1,6 @@
 {
-  "generated_at": "2026-06-18T13:36:25.704845+00:00",
-  "generation": 11,
+  "generated_at": "2026-06-19T09:34:54.802070+00:00",
+  "generation": 12,
   "total_rules": 16,
   "rules": [
     {
@@ -137,6 +137,25 @@
       "evidence": "BOS bearish neutral @15h → 100.0% WR N=7.0"
     },
     {
+      "id": "pat_008",
+      "type": "PATTERN",
+      "action": "BOOST",
+      "strength": "STRONG_BOOST",
+      "conditions": {
+        "setup_type": "BOS",
+        "bias": "bearish",
+        "zone_position": "neutral",
+        "hour_min": 15,
+        "hour_max": 17
+      },
+      "score_modifier": 20,
+      "min_rr": 1.6,
+      "win_rate": 0.943,
+      "samples": 5.3,
+      "confidence": 0.429,
+      "evidence": "BOS bearish neutral @15h → 94.3% WR N=5.3"
+    },
+    {
       "id": "pat_007",
       "type": "PATTERN",
       "action": "BOOST",
@@ -156,40 +175,6 @@
       "evidence": "EQH neutral neutral @21h → 93.0% WR N=5.2"
     },
     {
-      "id": "pat_008",
-      "type": "PATTERN",
-      "action": "BOOST",
-      "strength": "STRONG_BOOST",
-      "conditions": {
-        "setup_type": "BOS",
-        "bias": "bearish",
-        "zone_position": "neutral",
-        "hour_min": 15,
-        "hour_max": 17
-      },
-      "score_modifier": 20,
-      "min_rr": 1.6,
-      "win_rate": 1.0,
-      "samples": 5.0,
-      "confidence": 0.428,
-      "evidence": "BOS bearish neutral @15h → 100.0% WR N=5.0"
-    },
-    {
-      "id": "setup_012",
-      "type": "SETUP_PERFORMANCE",
-      "action": "BOOST",
-      "strength": "STRONG_BOOST",
-      "conditions": {
-        "setup_type": "EQH"
-      },
-      "score_modifier": 10,
-      "min_rr": 1.5,
-      "win_rate": 0.742,
-      "samples": 151,
-      "confidence": 0.95,
-      "evidence": "EQH: 74.2% WR über 151 Signale"
-    },
-    {
       "id": "bias_016",
       "type": "BIAS_PERFORMANCE",
       "action": "BOOST",
@@ -199,25 +184,10 @@
       },
       "score_modifier": 10,
       "min_rr": null,
-      "win_rate": 0.747,
-      "samples": 126,
-      "confidence": 0.95,
-      "evidence": "Bias bearish: 74.7% WR N=126"
-    },
-    {
-      "id": "setup_015",
-      "type": "SETUP_PERFORMANCE",
-      "action": "BOOST",
-      "strength": "STRONG_BOOST",
-      "conditions": {
-        "setup_type": "EQL"
-      },
-      "score_modifier": 10,
-      "min_rr": 1.5,
       "win_rate": 0.75,
-      "samples": 89,
+      "samples": 147,
       "confidence": 0.95,
-      "evidence": "EQL: 75.0% WR über 89 Signale"
+      "evidence": "Bias bearish: 75.0% WR N=147"
     },
     {
       "id": "setup_014",
@@ -229,10 +199,25 @@
       },
       "score_modifier": -18,
       "min_rr": null,
-      "win_rate": 0.167,
-      "samples": 65,
+      "win_rate": 0.154,
+      "samples": 70,
       "confidence": 0.95,
-      "evidence": "Zone: 16.7% WR über 65 Signale"
+      "evidence": "Zone: 15.4% WR über 70 Signale"
+    },
+    {
+      "id": "setup_012",
+      "type": "SETUP_PERFORMANCE",
+      "action": "BOOST",
+      "strength": "BOOST",
+      "conditions": {
+        "setup_type": "EQH"
+      },
+      "score_modifier": 5,
+      "min_rr": 1.5,
+      "win_rate": 0.717,
+      "samples": 169,
+      "confidence": 0.95,
+      "evidence": "EQH: 71.7% WR über 169 Signale"
     },
     {
       "id": "setup_010",
@@ -244,10 +229,25 @@
       },
       "score_modifier": 5,
       "min_rr": 1.5,
-      "win_rate": 0.652,
-      "samples": 117,
+      "win_rate": 0.655,
+      "samples": 131,
       "confidence": 0.95,
-      "evidence": "BOS: 65.2% WR über 117 Signale"
+      "evidence": "BOS: 65.5% WR über 131 Signale"
+    },
+    {
+      "id": "setup_015",
+      "type": "SETUP_PERFORMANCE",
+      "action": "BOOST",
+      "strength": "BOOST",
+      "conditions": {
+        "setup_type": "EQL"
+      },
+      "score_modifier": 5,
+      "min_rr": 1.5,
+      "win_rate": 0.683,
+      "samples": 105,
+      "confidence": 0.95,
+      "evidence": "EQL: 68.3% WR über 105 Signale"
     },
     {
       "id": "setup_013",
@@ -355,8 +355,8 @@
       "modifier_scale": 0.8,
       "confidence_threshold": 0.65,
       "min_rr_mult": 1.2,
-      "matched_rules": 4,
-      "boost_rules": 3,
+      "matched_rules": 2,
+      "boost_rules": 1,
       "block_rules": 1
     },
     "aggressive": {

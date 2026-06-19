@@ -1,27 +1,27 @@
 {
-  "erstellt_am": "2026-06-18T13:36:25.669831+00:00",
-  "accuracy": 0.7766,
-  "accuracy_pct": 77.66,
-  "trainings_samples": 385,
-  "wins_in_training": 258,
-  "losses_in_training": 127,
+  "erstellt_am": "2026-06-19T09:34:54.794141+00:00",
+  "accuracy": 0.8036,
+  "accuracy_pct": 80.36,
+  "trainings_samples": 402,
+  "wins_in_training": 261,
+  "losses_in_training": 141,
   "cv_scores": [
-    0.8182,
-    0.7922,
-    0.7273,
-    0.7273,
-    0.8182
+    0.7654,
+    0.7901,
+    0.8,
+    0.8875,
+    0.775
   ],
   "feature_importance": {
-    "setup_type_enc": 0.1083,
-    "timeframe_enc": 0.2033,
-    "bias_enc": 0.129,
-    "confidence_enc": 0.0762,
-    "confidence_score": 0.0707,
-    "volume_ratio": 0.0634,
-    "zone_position_enc": 0.1983,
-    "time_of_day": 0.0626,
-    "day_of_week": 0.0883
+    "setup_type_enc": 0.0979,
+    "timeframe_enc": 0.1776,
+    "bias_enc": 0.2085,
+    "confidence_enc": 0.1008,
+    "confidence_score": 0.076,
+    "volume_ratio": 0.055,
+    "zone_position_enc": 0.1463,
+    "time_of_day": 0.0565,
+    "day_of_week": 0.0814
   },
   "ersetzt_haiku": true
 }

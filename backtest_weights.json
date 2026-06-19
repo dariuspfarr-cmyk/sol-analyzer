@@ -1,9 +1,9 @@
 {
-  "erstellt_am": "2026-06-18T13:36:24.912183+00:00",
-  "total_samples": 473,
-  "live_samples": 115,
-  "live_weight": 0.7115,
-  "backtest_weight": 0.2885,
+  "erstellt_am": "2026-06-19T09:34:46.331195+00:00",
+  "total_samples": 491,
+  "live_samples": 133,
+  "live_weight": 0.7133,
+  "backtest_weight": 0.2867,
   "patterns": {
     "EQH|4h|neutral|neutral|15": {
       "key": "EQH|4h|neutral|neutral|15",
@@ -96,10 +96,10 @@
       "bias": "bearish",
       "zone_position": "neutral",
       "hour_bucket": 15,
-      "win_rate": 1.0,
-      "samples": 5.0,
-      "avg_rr": 2.0,
-      "score": 71
+      "win_rate": 0.9434,
+      "samples": 5.3,
+      "avg_rr": 2.011,
+      "score": 67
     },
     "BOS|1h|bearish|neutral|15": {
       "key": "BOS|1h|bearish|neutral|15",
@@ -181,9 +181,9 @@
       "score": 49
     },
     "13": {
-      "win_rate": 0.3593,
-      "samples": 13.4,
-      "score": 31
+      "win_rate": 0.4427,
+      "samples": 15.4,
+      "score": 36
     },
     "14": {
       "win_rate": 0.3571,
@@ -191,9 +191,9 @@
       "score": 32
     },
     "15": {
-      "win_rate": 0.8849,
-      "samples": 18.8,
-      "score": 63
+      "win_rate": 0.7882,
+      "samples": 21.1,
+      "score": 57
     },
     "16": {
       "win_rate": 0.434,
@@ -206,29 +206,29 @@
       "score": 17
     },
     "18": {
-      "win_rate": 0.4681,
-      "samples": 15.4,
-      "score": 38
+      "win_rate": 0.4396,
+      "samples": 16.4,
+      "score": 36
     },
     "19": {
-      "win_rate": 0.6091,
-      "samples": 3.9,
-      "score": 45
+      "win_rate": 0.3803,
+      "samples": 8.9,
+      "score": 31
     },
     "20": {
-      "win_rate": 0.7595,
-      "samples": 19.0,
-      "score": 55
+      "win_rate": 0.7214,
+      "samples": 20.0,
+      "score": 53
     },
     "21": {
-      "win_rate": 0.9091,
-      "samples": 2.0,
-      "score": 62
+      "win_rate": 0.301,
+      "samples": 6.0,
+      "score": 26
     },
     "22": {
-      "win_rate": 0.529,
-      "samples": 7.9,
-      "score": 40
+      "win_rate": 0.4225,
+      "samples": 9.9,
+      "score": 34
     },
     "23": {
       "win_rate": 0.6522,
@@ -238,8 +238,8 @@
   },
   "setup_performance": {
     "BOS": {
-      "win_rate": 0.6159,
-      "samples": 84.1,
+      "win_rate": 0.6183,
+      "samples": 85.4,
       "score": 55
     },
     "Volume": {
@@ -248,9 +248,9 @@
       "score": 49
     },
     "EQH": {
-      "win_rate": 0.6318,
-      "samples": 85.2,
-      "score": 56
+      "win_rate": 0.6055,
+      "samples": 92.2,
+      "score": 55
     },
     "CHoCH": {
       "win_rate": 0.6437,
@@ -258,14 +258,14 @@
       "score": 49
     },
     "Zone": {
-      "win_rate": 0.0904,
-      "samples": 31.0,
+      "win_rate": 0.085,
+      "samples": 33.0,
       "score": 17
     },
     "EQL": {
-      "win_rate": 0.6911,
-      "samples": 46.9,
-      "score": 55
+      "win_rate": 0.6013,
+      "samples": 53.9,
+      "score": 50
     }
   },
   "timeframe_performance": {
@@ -278,31 +278,31 @@
       "samples": 103.01999999999984
     },
     "15m": {
-      "win_rate": 0.3957,
-      "samples": 27.799999999999997
+      "win_rate": 0.3675,
+      "samples": 38.099999999999994
     },
     "1h": {
-      "win_rate": 0.3261,
-      "samples": 27.599999999999998
+      "win_rate": 0.2601,
+      "samples": 34.599999999999994
     }
   },
   "market_bias_performance": {
     "neutral": {
-      "win_rate": 0.5797,
-      "samples": 282.2,
-      "score": 67
+      "win_rate": 0.5563,
+      "samples": 299.5,
+      "score": 66
     }
   },
   "fear_greed_performance": {
     "neutral_fg": {
-      "win_rate": 0.6279,
-      "samples": 254.2,
+      "win_rate": 0.6244,
+      "samples": 257.2,
       "score": 70
     },
     "extreme_fear": {
-      "win_rate": 0.1429,
-      "samples": 28.0,
-      "score": 20
+      "win_rate": 0.1418,
+      "samples": 42.3,
+      "score": 21
     }
   },
   "adx_bucket_performance": {},
@@ -313,14 +313,14 @@
       "score": 9
     },
     "normal_vol": {
-      "win_rate": 0.0714,
-      "samples": 14.0,
-      "score": 14
+      "win_rate": 0.0526,
+      "samples": 19.0,
+      "score": 13
     },
     "low_vol": {
-      "win_rate": 0.2143,
-      "samples": 14.0,
-      "score": 22
+      "win_rate": 0.2146,
+      "samples": 23.3,
+      "score": 23
     }
   },
   "trigger_combo_performance": {
@@ -365,14 +365,14 @@
       "score": 63
     },
     "EQL": {
-      "win_rate": 0.6841,
-      "samples": 36.0,
-      "score": 53
+      "win_rate": 0.5726,
+      "samples": 43.0,
+      "score": 47
     },
     "EQH,EQL": {
-      "win_rate": 0.9086,
-      "samples": 35.7,
-      "score": 66
+      "win_rate": 0.8064,
+      "samples": 42.7,
+      "score": 61
     },
     "EQL,ZONE": {
       "win_rate": 0.5882,
@@ -408,9 +408,9 @@
   "setup_adx_performance": {},
   "mtf_alignment_performance": {
     "neutral_mtf": {
-      "win_rate": 0.1429,
-      "samples": 21.0,
-      "score": 19
+      "win_rate": 0.1416,
+      "samples": 35.3,
+      "score": 20
     }
   }
 }

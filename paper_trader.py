@@ -706,6 +706,44 @@ def _fetch_price() -> Optional[float]:
         return None
 
 
+# ── Regime-bewusste Setup-Eignung ─────────────────────────────────────────────
+# Datenbasis: In der jüngsten starken Trendphase brachen die Reversal-/Mean-
+# Reversion-Setups (EQH/EQL/Zone) auf 0–7% Win-Rate ein, während das Trend-Folge-
+# Setup BOS bei 100% lag. Reversal-Setups funktionieren in Ranges, Trend-Setups
+# in Trends — der Bot muss das Regime berücksichtigen statt regime-blind zu feuern.
+_REVERSAL_SETUPS = {"EQH", "EQL", "Zone"}
+_TREND_SETUPS    = {"BOS", "CHoCH"}
+
+
+def _setup_category(setup_type: str) -> str:
+    """reversal (EQH/EQL/Zone) · trend (BOS/CHoCH) · neutral (Volume/sonst)."""
+    if setup_type in _REVERSAL_SETUPS:
+        return "reversal"
+    if setup_type in _TREND_SETUPS:
+        return "trend"
+    return "neutral"
+
+
+def _market_regime() -> str:
+    """
+    Aktuelles Markt-Regime aus ADX + Trend-Konsens (Daily/1h).
+      strong_trend — ADX≥27 ODER (Daily & 1h einig und ADX≥20)
+      ranging      — ADX<18
+      moderate     — dazwischen
+    Erfasst auch die 'choppy-bear'-Lage (ADX~21 + bärischer Konsens), die der
+    reine ADX-Bucket (>28) verfehlt hätte.
+    """
+    adx       = _adx_cache.get("value", 25.0)
+    daily     = _get_daily_trend()
+    h1        = _get_1h_trend()
+    consensus = daily != "neutral" and daily == h1
+    if adx >= 27 or (consensus and adx >= 20):
+        return "strong_trend"
+    if adx < 18:
+        return "ranging"
+    return "moderate"
+
+
 # ── Signal-Selektion ──────────────────────────────────────────────────────────
 def _score_signal(row: dict, market_bias: str, hourly_perf: dict,
                   weights: dict, sig_map: dict) -> float:
@@ -1023,6 +1061,21 @@ def _score_signal(row: dict, market_bias: str, hourly_perf: dict,
     except Exception:
         pass
 
+    # Regime-bewusste Setup-Eignung (deterministischer Prior, ergänzt das Lernen):
+    # Reversal-Setups (EQH/EQL/Zone) in Trends bestrafen, Trend-Setups (BOS/CHoCH)
+    # belohnen — und in Ranges umgekehrt. Greift sofort, ohne Lern-Samples.
+    try:
+        _regime = _market_regime()
+        _cat    = _setup_category(setup)
+        if _regime == "strong_trend":
+            if   _cat == "reversal": composite -= 18.0   # Reversal in Trend = ~0% WR
+            elif _cat == "trend":    composite +=  8.0
+        elif _regime == "ranging":
+            if   _cat == "reversal": composite +=  6.0   # Reversal in Range = Brot & Butter
+            elif _cat == "trend":    composite -=  6.0   # Trend-Folge in Range = Whipsaws
+    except Exception:
+        pass
+
     # MTF-Alignment: HTF-Bestätigung des Signals (gelernt wenn Daten da, sonst Default)
     try:
         mtf_a = row.get("mtf_alignment")
@@ -1213,6 +1266,16 @@ def _get_db_signal(state: Optional["State"] = None) -> Optional[dict]:
         # bestätigen (Alignment ≥ +1) — sonst überspringen.
         if setup_type == "Zone":
             if mtf_a is None or int(float(mtf_a)) < 1:
+                continue
+
+        # Regime-Gate: Reversal-Setup (EQH/EQL/Zone) GEGEN einen starken Trend
+        # = historisch ~0% WR (jüngste Trendphase). Überspringen.
+        if _setup_category(setup_type) == "reversal" and _market_regime() == "strong_trend":
+            _dt = _get_daily_trend()
+            _dir = "long" if bias == "bullish" else "short"
+            _counter = (_dt == "bullish" and _dir == "short") or \
+                       (_dt == "bearish" and _dir == "long")
+            if _counter:
                 continue
 
         # Bull Run Short-Gate: kein Short in early_bull / mid_bull
