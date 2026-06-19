@@ -5101,6 +5101,10 @@ class LiveChart {
     }
 
     // ── Schritt 2: Signal-Dreiecke (obendrauf) ────────────────────
+    // Text (Konfidenz, Label) NUR fürs jüngste Signal — ältere bleiben als
+    // reines Dreieck, damit das Kerzen-Panel nicht mit Text überfrachtet wird.
+    let _mLbl = -1;
+    this.signals.forEach(s=>{ if(s.idx>=this.startI && s.idx<this.endI && s.idx>_mLbl) _mLbl = s.idx; });
     this.signals.forEach(s=>{
       if(s.idx<this.startI||s.idx>=this.endI) return;
       const x=this.toX(s.idx), c=this.candles[s.idx];
@@ -5129,14 +5133,16 @@ class LiveChart {
       }
 
       ctx.textAlign='center';
-      if(s.conf!=null){
-        ctx.fillStyle=col; ctx.font='8px Segoe UI';
-        ctx.fillText(Math.round(s.conf*100)+'%',x,isL?ey+12:ey-6);
-      }
-      if(this.candleW>7){
-        const lbl = s.label || (isL?'▲L':'▼S');
-        ctx.fillStyle=col+(isBreak?'ff':'bb'); ctx.font=`bold 9px Segoe UI`;
-        ctx.fillText(lbl, x, isL?ey+(s.conf!=null?22:14):ey-(s.conf!=null?20:12));
+      if(s.idx===_mLbl){
+        if(s.conf!=null){
+          ctx.fillStyle=col; ctx.font='8px Segoe UI';
+          ctx.fillText(Math.round(s.conf*100)+'%',x,isL?ey+12:ey-6);
+        }
+        if(this.candleW>7){
+          const lbl = s.label || (isL?'▲L':'▼S');
+          ctx.fillStyle=col+(isBreak?'ff':'bb'); ctx.font=`bold 9px Segoe UI`;
+          ctx.fillText(lbl, x, isL?ey+(s.conf!=null?22:14):ey-(s.conf!=null?20:12));
+        }
       }
     });
   }
@@ -5144,10 +5150,11 @@ class LiveChart {
   _drawBotSignals(pr, y0, ph) {
     if (!this.botSignals?.length) return;
     const ctx = this.ctx, {lo, hi} = pr;
-    // TP/SL-Zone nur fürs jüngste aktive-TF-Signal (Declutter, s. _drawSignals)
-    let _botZoneIdx = -1;
+    // TP/SL-Zone + volles Label nur fürs jüngste aktive-TF-Signal (Declutter).
+    let _botZoneIdx = -1, _botLabelIdx = -1;
     for (const s of this.botSignals) {
       if (s.idx < this.startI || s.idx >= this.endI) continue;
+      if (!s.otherTf && s.idx > _botLabelIdx) _botLabelIdx = s.idx;
       if (s.sl && s.tp && !s.otherTf && s.idx > _botZoneIdx) _botZoneIdx = s.idx;
     }
     for (const s of this.botSignals) {
@@ -5194,11 +5201,18 @@ class LiveChart {
       ctx.strokeStyle=col; ctx.lineWidth = s.otherTf ? 1 : 1.5;
       if (s.otherTf) ctx.setLineDash([2,2]);
       ctx.stroke(); ctx.setLineDash([]);
-      // Label inkl. Timeframe-Zuordnung (z. B. "◆ BOS · 4H")
-      ctx.font='bold 8px Segoe UI'; ctx.textAlign='center'; ctx.fillStyle=col;
-      const tfTag = s.timeframe ? ' · '+s.timeframe.toUpperCase() : '';
-      const lbl = (s.source==='PAPER'?'◈':'◆')+' '+(s.setup||'BOT')+tfTag;
-      ctx.fillText(lbl, x, isL ? baseY+sz+9 : baseY-sz-2);
+      // Label: volles Label nur fürs jüngste Signal; ältere/Fremd-TF nur ein
+      // kompakter TF-Tag (z. B. "4H") — Kontext bleibt, ohne Text-Brei.
+      ctx.textAlign='center'; ctx.fillStyle=col;
+      if (s.idx === _botLabelIdx) {
+        ctx.font='bold 8px Segoe UI';
+        const tfTag = s.timeframe ? ' · '+s.timeframe.toUpperCase() : '';
+        const lbl = (s.source==='PAPER'?'◈':'◆')+' '+(s.setup||'BOT')+tfTag;
+        ctx.fillText(lbl, x, isL ? baseY+sz+9 : baseY-sz-2);
+      } else if (s.timeframe) {
+        ctx.font='8px Segoe UI';
+        ctx.fillText(s.timeframe.toUpperCase(), x, isL ? baseY+sz+9 : baseY-sz-2);
+      }
       ctx.restore();
 
       // ── Einstiegszonen für offene Signale (nur aktiver TF) ───────────────
