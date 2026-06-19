@@ -13,14 +13,43 @@ from pathlib import Path
 
 import config as cfg
 
-REPORT_FILE  = Path(__file__).parent / "performance_report.json"
-CHANGES_LOG  = Path(__file__).parent / "threshold_changes.log"
+REPORT_FILE    = Path(__file__).parent / "performance_report.json"
+CHANGES_LOG    = Path(__file__).parent / "threshold_changes.log"
+EVOLUTION_FILE = Path(__file__).parent / "strategy_evolution.json"
 
 # Win-Rate-Schwellen für Anpassungen
 WR_LOW_THRESHOLD  = 45.0   # unter diesem Wert → strenger werden
 WR_HIGH_THRESHOLD = 65.0   # über diesem Wert  → lockerer werden
 API_EFF_THRESHOLD = 30.0   # API-Effizienz unter diesem Wert → Haiku strenger
 VOL_FP_THRESHOLD  = 35.0   # Volumen-Filter Win-Rate unter diesem Wert → Multiplikator erhöhen
+WR_DECLINE_FREEZE = 2.0    # fällt die Gesamt-WR um ≥ X Punkte → ALLE Lockerungen
+                           # einfrieren (nur noch Verschärfung). Bricht die
+                           # Runaway-Schleife "WR>65% → lockern → WR fällt → lockern".
+
+
+def _wr_is_declining() -> tuple[bool, float, float]:
+    """
+    True, wenn die Gesamt-Win-Rate fällt — mittlere WR der letzten 3 Lern-Zyklen
+    vs. der davor, gemessen an strategy_evolution.json (spiegelt die P1-Logik des
+    improvement_scanner). Bei zu wenig Historie: nicht-fallend.
+    HAUPTZIEL ist WR-Maximierung über Selektivität: in einer Abwärtsphase darf der
+    Optimizer NICHT lockern (= mehr Signale), das verschärft den Rückgang nur.
+    Gibt (declining, earlier_avg, recent_avg) zurück.
+    """
+    try:
+        with open(EVOLUTION_FILE, encoding="utf-8") as f:
+            ev = json.load(f)
+        wrs = [(e.get("metrics_after") or {}).get("win_rate") for e in ev]
+        wrs = [w for w in wrs if isinstance(w, (int, float))]
+    except Exception:
+        return False, 0.0, 0.0
+    if len(wrs) < 4:
+        return False, 0.0, 0.0
+    recent      = wrs[-3:]
+    earlier     = wrs[:-3]
+    recent_avg  = sum(recent) / len(recent)
+    earlier_avg = sum(earlier) / len(earlier)
+    return (earlier_avg - recent_avg >= WR_DECLINE_FREEZE, earlier_avg, recent_avg)
 
 
 def _log(msg: str) -> None:
@@ -42,7 +71,8 @@ def _confidence_str(val: int) -> str:
 
 # ── Einzelne Anpassungs-Logik ─────────────────────────────────────────────────
 def _adjust_setup_confidence(setup_type: str, win_rate: float,
-                              current_cfg: dict) -> tuple[dict, list[str]]:
+                              current_cfg: dict,
+                              allow_loosen: bool = True) -> tuple[dict, list[str]]:
     """Passt MIN_CONFIDENCE und WEIGHT eines Setup-Typs an."""
     changes = []
     key_conf  = f"{setup_type}_MIN_CONFIDENCE"
@@ -74,8 +104,9 @@ def _adjust_setup_confidence(setup_type: str, win_rate: float,
                 f"(Performance schwach)"
             )
 
-    elif win_rate > WR_HIGH_THRESHOLD:
+    elif win_rate > WR_HIGH_THRESHOLD and allow_loosen:
         # Gute Performance → lockerer werden, mehr Signale einfangen
+        # (nur wenn die Gesamt-WR NICHT fällt — sonst frieren wir ein)
         new_conf = max(cur_conf - 1, int(cfg.BOUNDS[key_conf]["min"]))
         if new_conf != cur_conf:
             current_cfg[key_conf] = new_conf
@@ -97,7 +128,8 @@ def _adjust_setup_confidence(setup_type: str, win_rate: float,
 
 
 def _adjust_haiku_strictness(api_efficiency: float,
-                              current_cfg: dict) -> tuple[dict, list[str]]:
+                              current_cfg: dict,
+                              allow_loosen: bool = True) -> tuple[dict, list[str]]:
     """Passt HAIKU_STRICTNESS an basierend auf API-Effizienz."""
     changes  = []
     key      = "HAIKU_STRICTNESS"
@@ -113,8 +145,9 @@ def _adjust_haiku_strictness(api_efficiency: float,
                 f"(API-Effizienz {api_efficiency:.1f}% < {API_EFF_THRESHOLD}%)"
             )
 
-    elif api_efficiency > 60.0:
+    elif api_efficiency > 60.0 and allow_loosen:
         # Hohe Effizienz → etwas lockerer, um mehr valide Signale durchzulassen
+        # (eingefroren, solange die Gesamt-WR fällt)
         new_val = cfg.clamp(key, cur_val - max_d * 0.3)
         if abs(new_val - cur_val) > 0.01:
             current_cfg[key] = round(new_val, 3)
@@ -127,7 +160,8 @@ def _adjust_haiku_strictness(api_efficiency: float,
 
 
 def _adjust_volume_multiplier(vol_win_rate: float | None,
-                               current_cfg: dict) -> tuple[dict, list[str]]:
+                               current_cfg: dict,
+                               allow_loosen: bool = True) -> tuple[dict, list[str]]:
     """Passt VOLUME_SPIKE_MULTIPLIER an."""
     changes = []
     if vol_win_rate is None:
@@ -148,8 +182,8 @@ def _adjust_volume_multiplier(vol_win_rate: float | None,
                 f"zu viele False Positives)"
             )
 
-    elif vol_win_rate > 70.0:
-        # Sehr guter Volumen-Filter → leicht lockern
+    elif vol_win_rate > 70.0 and allow_loosen:
+        # Sehr guter Volumen-Filter → leicht lockern (eingefroren bei WR-Rückgang)
         new_val = cfg.clamp(key, cur_val - 0.1)
         if abs(new_val - cur_val) > 0.001 and new_val >= cfg.BOUNDS[key]["min"]:
             current_cfg[key] = round(new_val, 2)
@@ -216,20 +250,25 @@ def _merge_with_backtest(live_report: dict) -> dict:
 
 
 def _adjust_detection_params(report: dict,
-                              current_cfg: dict) -> tuple[dict, list[str]]:
+                              current_cfg: dict,
+                              allow_loosen: bool = True) -> tuple[dict, list[str]]:
     """
     Passt Signal-Erkennungsparameter basierend auf Setup-Win-Rates an.
       BOS schlechte WR   → PIVOT_LB erhöhen (signifikantere Swings suchen)
       EQH/EQL gute WR    → EQH_TOLERANCE lockern (mehr Signale einfangen)
       EQH/EQL schlechte  → EQH_TOLERANCE verschärfen
       CHoCH schlechte WR → CHOCH_WINDOW vergrößern (stärkere Trendbestätigung)
+    Lockerungen sind eingefroren, solange die Gesamt-WR fällt (allow_loosen).
     """
     changes    = []
     setup_data = report.get("nach_setup_typ", {})
 
+    def _closed(d):  # Signifikanz nur über GESCHLOSSENE Trades
+        return d.get("closed", d.get("count", 0))
+
     # ── PIVOT_LB basierend auf BOS-Performance ───────────────────────────────
     bos = setup_data.get("BOS", {})
-    if bos.get("count", 0) >= 15:
+    if _closed(bos) >= 15:
         bos_wr = bos.get("win_rate_pct", 50.0)
         key    = "PIVOT_LB"
         cur    = float(current_cfg.get(key, cfg.BOUNDS[key]["default"]))
@@ -241,7 +280,7 @@ def _adjust_detection_params(report: dict,
                     f"PIVOT_LB: {cur:.0f} → {new:.0f} "
                     f"(BOS Win-Rate {bos_wr:.1f}% zu niedrig → größeres Pivot-Fenster)"
                 )
-        elif bos_wr > WR_HIGH_THRESHOLD:
+        elif bos_wr > WR_HIGH_THRESHOLD and allow_loosen:
             new = cfg.clamp(key, cur - 1)
             if new != cur:
                 current_cfg[key] = int(new)
@@ -253,11 +292,11 @@ def _adjust_detection_params(report: dict,
     # ── EQH_TOLERANCE basierend auf EQH- und EQL-Performance ────────────────
     eqh     = setup_data.get("EQH", {})
     eql     = setup_data.get("EQL", {})
-    eq_cnt  = eqh.get("count", 0) + eql.get("count", 0)
+    eq_cnt  = _closed(eqh) + _closed(eql)
     if eq_cnt >= 15:
         eq_wr = (
-            eqh.get("win_rate_pct", 50.0) * eqh.get("count", 0)
-            + eql.get("win_rate_pct", 50.0) * eql.get("count", 0)
+            eqh.get("win_rate_pct", 50.0) * _closed(eqh)
+            + eql.get("win_rate_pct", 50.0) * _closed(eql)
         ) / eq_cnt
         key   = "EQH_TOLERANCE"
         cur   = float(current_cfg.get(key, cfg.BOUNDS[key]["default"]))
@@ -270,7 +309,7 @@ def _adjust_detection_params(report: dict,
                     f"EQH_TOLERANCE: {cur:.4f} → {new:.4f} "
                     f"(EQ Win-Rate {eq_wr:.1f}% niedrig → strenger)"
                 )
-        elif eq_wr > WR_HIGH_THRESHOLD:
+        elif eq_wr > WR_HIGH_THRESHOLD and allow_loosen:
             new = cfg.clamp(key, cur + max_d * 0.3)
             if abs(new - cur) > 0.0001:
                 current_cfg[key] = round(new, 4)
@@ -281,7 +320,7 @@ def _adjust_detection_params(report: dict,
 
     # ── CHOCH_WINDOW basierend auf CHoCH-Performance ─────────────────────────
     choch = setup_data.get("CHoCH", {})
-    if choch.get("count", 0) >= 15:
+    if _closed(choch) >= 15:
         choch_wr = choch.get("win_rate_pct", 50.0)
         key      = "CHOCH_WINDOW"
         cur      = float(current_cfg.get(key, cfg.BOUNDS[key]["default"]))
@@ -293,7 +332,7 @@ def _adjust_detection_params(report: dict,
                     f"CHOCH_WINDOW: {cur:.0f} → {new:.0f} "
                     f"(CHoCH Win-Rate {choch_wr:.1f}% zu niedrig → mehr Kerzen für Trendbestätigung)"
                 )
-        elif choch_wr > WR_HIGH_THRESHOLD:
+        elif choch_wr > WR_HIGH_THRESHOLD and allow_loosen:
             new = cfg.clamp(key, cur - 2)
             if new != cur:
                 current_cfg[key] = int(new)
@@ -328,24 +367,33 @@ def run(report_path: Path = REPORT_FILE) -> int:
     vol_info     = report.get("volumen_filter", {})
     vol_wr       = vol_info.get("win_rate_pct")
 
+    # ── WR-Trend-Bremse: bei fallender Gesamt-WR ALLE Lockerungen einfrieren ──
+    # (HAUPTZIEL = WR via Selektivität; in einer Abwärtsphase nur verschärfen).
+    declining, ea, ra = _wr_is_declining()
+    allow_loosen = not declining
+    if declining:
+        _log(f"⏸️  WR fällt ({ea:.1f}% → {ra:.1f}%) → Lockerungen eingefroren "
+             f"(nur Verschärfung erlaubt).")
+
     # ── 1. Pro Setup-Typ: Konfidenz & Gewicht anpassen ───────────────────────
     for stype, stats in report.get("nach_setup_typ", {}).items():
-        if stats.get("count", 0) < 15:
-            continue   # min. 15 Samples nötig (stat. belastbar bei 50% Baseline-WR)
+        if stats.get("closed", stats.get("count", 0)) < 15:
+            continue   # min. 15 GESCHLOSSENE Samples nötig (stat. belastbar)
         wr = stats.get("win_rate_pct", 50.0)
-        current_cfg, changes = _adjust_setup_confidence(stype, wr, current_cfg)
+        current_cfg, changes = _adjust_setup_confidence(
+            stype, wr, current_cfg, allow_loosen)
         all_changes.extend(changes)
 
     # ── 2. Haiku-Striktheit ──────────────────────────────────────────────────
-    current_cfg, changes = _adjust_haiku_strictness(api_eff, current_cfg)
+    current_cfg, changes = _adjust_haiku_strictness(api_eff, current_cfg, allow_loosen)
     all_changes.extend(changes)
 
     # ── 3. Volumen-Multiplikator ─────────────────────────────────────────────
-    current_cfg, changes = _adjust_volume_multiplier(vol_wr, current_cfg)
+    current_cfg, changes = _adjust_volume_multiplier(vol_wr, current_cfg, allow_loosen)
     all_changes.extend(changes)
 
     # ── 4. Signal-Erkennungsparameter (PIVOT_LB, EQH_TOL, CHOCH_WIN) ─────────
-    current_cfg, changes = _adjust_detection_params(report, current_cfg)
+    current_cfg, changes = _adjust_detection_params(report, current_cfg, allow_loosen)
     all_changes.extend(changes)
 
     # ── Feststeckende Parameter erkennen ────────────────────────────────────
