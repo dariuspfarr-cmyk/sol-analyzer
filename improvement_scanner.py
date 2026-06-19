@@ -228,6 +228,57 @@ def scan_trading() -> list[dict]:
     return out
 
 
+# Ziel des Gesamtsystems: maximale Win-Rate. Dieser Analyzer macht die WR zum
+# permanenten Nordstern — jeder Rückgang oder ein Wert unter Ziel wird sofort
+# als hochpriorisierter Punkt gemeldet, damit die WR nie wieder unbemerkt
+# erodiert (wie zuletzt von ~85% auf 18%).
+WR_TARGET = 60.0
+
+
+def scan_winrate_trend() -> list[dict]:
+    out = []
+    ev = _read_json(BASE / "strategy_evolution.json")
+    if not isinstance(ev, list):
+        return out
+    wrs = [(e.get("metrics_after") or {}).get("win_rate") for e in ev]
+    wrs = [float(w) for w in wrs if isinstance(w, (int, float))]
+    if len(wrs) < 4:
+        return out
+
+    cur         = wrs[-1]
+    recent      = wrs[-3:]
+    earlier     = wrs[:-3] or recent
+    recent_avg  = sum(recent) / len(recent)
+    earlier_avg = sum(earlier) / len(earlier)
+    drop        = earlier_avg - recent_avg
+
+    # WR fällt deutlich (Trend nach unten)
+    if drop >= 5.0:
+        out.append(_finding(
+            "trading", "P1",
+            f"Win-Rate sinkt ({earlier_avg:.0f}% → {recent_avg:.0f}%)",
+            f"Mittlere Win-Rate fiel von {earlier_avg:.1f}% auf zuletzt "
+            f"{recent_avg:.1f}% (aktuell {cur:.1f}%).",
+            "WIN-RATE IST DAS HAUPTZIEL. Regime-Wechsel prüfen (Reversal- vs "
+            "Trend-Setups), Selektivität erhöhen, verlierende Setups/Regime härter "
+            "filtern. Ggf. backtester.py nutzen, um optimale Schwellen zu finden.",
+            "strategy_evolution.json", key="wr_declining",
+        ))
+
+    # WR unter Zielwert
+    if cur < WR_TARGET:
+        out.append(_finding(
+            "trading", "P2",
+            f"Win-Rate unter Ziel ({cur:.0f}% < {WR_TARGET:.0f}%)",
+            f"Aktuelle Win-Rate {cur:.1f}% liegt unter dem Zielwert {WR_TARGET:.0f}%.",
+            "Selektiver werden: nur A+-Setups zulassen (Trend-Folge im Trend, "
+            "Confluence ≥2 Trigger, hohe Konfidenz). Schwächste Setups/TFs/Bias "
+            "im aktuellen Regime drosseln.",
+            "strategy_evolution.json", key="wr_below_target",
+        ))
+    return out
+
+
 def scan_code_metrics() -> list[dict]:
     out = []
     todo_hits: list[str] = []
@@ -425,7 +476,7 @@ def _write_md(doc: dict) -> None:
 def run(fast: bool = False) -> dict:
     """Führt alle Analyzer aus, mergt mit Historie, schreibt Backlog. Robust."""
     findings: list[dict] = []
-    for fn in (scan_errors, scan_trading, scan_code_metrics, scan_health):
+    for fn in (scan_errors, scan_trading, scan_winrate_trend, scan_code_metrics, scan_health):
         try:
             findings += fn()
         except Exception as e:

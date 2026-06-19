@@ -4,6 +4,16 @@ Self-Learning SMC-Trading-Bot für SOL/USDT mit Paper Trader, Web-Dashboards und
 automatischem Lern-/Optimierungskreislauf. Python-Backend + eingebettete HTML/JS-
 Dashboards. Windows / PowerShell. Python via `.venv`.
 
+## 🎯 HAUPTZIEL: Win-Rate maximieren
+
+Das übergeordnete Ziel des gesamten Systems ist eine **maximale Win-Rate** — über
+**Selektivität**, nicht über R:R-Tricks (winzige TPs blähen die WR auf, verlieren
+aber Geld). Konkret heißt das: nur **A+-Setups** traden (regime-passend: Trend-Folge
+im Trend, Reversal in Ranges; Confluence ≥2 Trigger; hohe Konfidenz; verlierende
+Setups/TFs/Bias hart filtern). Der Scanner meldet WR-Rückgänge automatisch als P1.
+Bei jeder Änderung an der Trading-Logik: **Wirkt sie WR-erhöhend?** Wenn unklar,
+mit `backtester.py` / `performance_compare.py` prüfen.
+
 ## 🤖 Verbesserungs-Backlog — BEI JEDEM START PRÜFEN
 
 **`IMPROVEMENTS.md`** ist ein **automatisch generierter, priorisierter Backlog**
