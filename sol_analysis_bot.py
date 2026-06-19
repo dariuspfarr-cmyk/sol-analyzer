@@ -848,6 +848,16 @@ def main():
         if routing == "algo" or ai_used:
             if routing == "ai" and ai_used:
                 print(f"     ↓ KI-Budget verbraucht → Algo-Pfad für {tf}")
+            # ALGO-Reversals ohne Bestätigung verwerfen: Reversal-Setups, die OHNE
+            # KI-Prüfung (ALGO-Pfad) UND OHNE Trend-Rückenwind (align ≤ 0) laufen,
+            # sind die empirisch dominante Verlierer-Klasse (ALGO ≈ 19% WR) — und
+            # zwar unabhängig vom ADX-Niveau (greift auch bei moderater ADX, wo der
+            # Regime-Filter oben noch nicht zieht). Nur trend-konforme Reversals
+            # (align > 0) oder KI-bestätigte (eigener Pfad unten) sind erlaubt.
+            if _setup_t in ("EQH", "EQL", "Zone") and align <= 0:
+                print(f"     ✗ ALGO-Reversal {_setup_t} ohne Trend-/KI-Bestätigung "
+                      f"(MTF {align}) – übersprungen.")
+                continue
             result = _ae.process_signal(zones, df, reason, tf)
             if result.get("signal_id"):
                 _set_signal_meta(result["signal_id"], align, _adx)
