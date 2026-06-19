@@ -86,6 +86,11 @@ MIN_SCORE_FLOOR       = 65.0 # Mindest-Composite-Score; schlechtere Signale werd
 DAILY_LOSS_LIMIT_PCT  = 0.02 # Tägliches Verlust-Limit 2% → kein neuer Trade bis nächsten Tag
 MAX_CONSECUTIVE_LOSSES = 6   # nach N Verlusten in Folge: Trading-Pause (Circuit-Breaker)
 LOSS_PAUSE_HOURS       = 12  # Dauer der Pause nach Verlustserie
+# ── Backtest-validierte Selektivität (selectivity_backtest.py) ────────────────
+# Out-of-sample: diese Filter hoben die Test-WR von 43% auf 67% (von Verlust zu
+# Gewinn). Ziel des Systems = maximale Win-Rate.
+MIN_TRIGGERS_CONFLUENCE = 2     # ≥2 bestätigende Trigger (Einzel-Trigger = schwach)
+PAPER_TRADE_ALGO        = False # ALGO-Signale senken die WR → nicht paper-traden (nur LIVE)
 DEDUP_HOURS           = 2.0  # Setup+Bias-Duplikat-Sperre: kein erneuter Eintritt innerhalb N Stunden
 WIN_STREAK_BONUS_MIN  = 3    # ab N Gewinnen in Folge: Risiko-Bonus
 DD_SCALE_MAX_PCT      = 10.0 # bei 10% Drawdown → 50% der normalen Risikogröße
@@ -1287,11 +1292,23 @@ def _get_db_signal(state: Optional["State"] = None) -> Optional[dict]:
         except Exception:
             pass
 
-        # Mindest-Konfidenz
+        # Confluence-Gate (Backtest-validiert): ≥2 bestätigende Trigger.
+        # Einzel-Trigger-Signale sind schwach — dieser Filter hob die Out-of-
+        # Sample-WR von 43% auf 62%.
+        try:
+            _ntrig = len(json.loads(row.get("all_triggers") or "[]"))
+        except Exception:
+            _ntrig = 1
+        if _ntrig < MIN_TRIGGERS_CONFLUENCE:
+            continue
+
+        # Mindest-Konfidenz + Quellen-Filter
         if src == "LIVE":
             if (row.get("confidence_score") or 0.0) < MIN_CONFIDENCE_SCORE:
                 continue
         elif src == "ALGO":
+            if not PAPER_TRADE_ALGO:
+                continue   # Backtest: ALGO-Signale senken die WR → nur LIVE paper-traden
             if (row.get("algo_score") or 0.0) < ALGO_MIN_SCORE:
                 continue
             if row.get("routing") == "algo_log":
