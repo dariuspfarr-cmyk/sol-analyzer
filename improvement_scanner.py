@@ -114,41 +114,46 @@ def scan_trading() -> list[dict]:
     if rep:
         g = rep.get("gesamt", {})
 
-        # Verlierende Setup-Typen (statistisch belastbar ab 15 Signalen)
+        # Verlierende Setup-Typen (statistisch belastbar ab 15 GESCHLOSSENEN Signalen).
+        # WR/PnL nur über geschlossene Trades beurteilen — offene Signale haben noch
+        # kein Outcome (sonst falsch-positive "0%"-Funde, s. closed-Gate).
         for stype, s in (rep.get("nach_setup_typ") or {}).items():
-            n, wr, pnl = s.get("count", 0), s.get("win_rate_pct", 50), s.get("avg_pnl_pct", 0)
-            if n >= 15 and (wr < 40 or pnl < -0.5):
+            cl = s.get("closed", s.get("count", 0))
+            wr, pnl = s.get("win_rate_pct", 50), s.get("avg_pnl_pct", 0)
+            if cl >= 15 and (wr < 40 or pnl < -0.5):
                 out.append(_finding(
                     "trading", "P1",
                     f"Setup «{stype}» verliert Geld (WR {wr:.0f}%, Ø {pnl:+.2f}%)",
-                    f"{n} Signale, Win-Rate {wr:.1f}%, Ø-PnL {pnl:+.2f}%.",
+                    f"{cl} geschlossene Signale, Win-Rate {wr:.1f}%, Ø-PnL {pnl:+.2f}%.",
                     f"Gewicht von «{stype}» in config.json deutlich senken oder Setup "
                     f"gezielt filtern (z. B. nur in passendem Markt-Kontext zulassen). "
                     f"Win-Rate < 40% bedeutet aktiver Kapitalverlust.",
                     "performance_report.json", key=f"setup_loss_{stype}",
                 ))
 
-        # Schwache Timeframes
+        # Schwache Timeframes (nur ab 15 geschlossenen Trades)
         for tf, s in (rep.get("nach_timeframe") or {}).items():
-            n, wr = s.get("count", 0), s.get("win_rate_pct", 50)
-            if n >= 15 and wr < 42:
+            cl = s.get("closed", s.get("count", 0))
+            wr = s.get("win_rate_pct", 50)
+            if cl >= 15 and wr < 42:
                 out.append(_finding(
                     "trading", "P2",
                     f"Timeframe {tf} schwach (WR {wr:.0f}%)",
-                    f"{n} Signale auf {tf}, Win-Rate nur {wr:.1f}%.",
+                    f"{cl} geschlossene Signale auf {tf}, Win-Rate nur {wr:.1f}%.",
                     f"Schwellen/Filter für {tf} verschärfen oder {tf} niedriger "
                     f"gewichten; prüfen ob die SMC-Parameter für {tf} sinnvoll skaliert sind.",
                     "performance_report.json", key=f"tf_weak_{tf}",
                 ))
 
-        # Schwacher Bias
+        # Schwacher Bias (nur ab 20 geschlossenen Trades)
         for bias, s in (rep.get("nach_bias") or {}).items():
-            n, wr = s.get("count", 0), s.get("win_rate_pct", 50)
-            if n >= 20 and wr < 45:
+            cl = s.get("closed", s.get("count", 0))
+            wr = s.get("win_rate_pct", 50)
+            if cl >= 20 and wr < 45:
                 out.append(_finding(
                     "trading", "P2",
                     f"{bias.capitalize()}-Signale schwach (WR {wr:.0f}%)",
-                    f"{n} {bias}-Signale, Win-Rate {wr:.1f}%.",
+                    f"{cl} geschlossene {bias}-Signale, Win-Rate {wr:.1f}%.",
                     f"Prüfen ob {bias}-Setups im aktuellen Marktregime systematisch "
                     f"benachteiligt sind (z. B. Bias-Filter über web_researcher/MTF schärfen).",
                     "performance_report.json", key=f"bias_weak_{bias}",

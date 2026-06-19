@@ -186,6 +186,7 @@ def run() -> dict[str, Any]:
     for stype, grp in _group_by(signals, "setup_type").items():
         by_setup[stype] = {
             "count":       len(grp),
+            "closed":      sum(1 for s in grp if s.get("outcome") in ("WIN", "LOSS")),
             "win_rate_pct": _win_rate(grp),
             "avg_pnl_pct": _avg_pnl([s for s in grp if s.get("outcome") in ("WIN","LOSS")]),
             "avg_rr":      _avg_rr(grp),
@@ -196,6 +197,7 @@ def run() -> dict[str, Any]:
     for tf, grp in _group_by(signals, "timeframe").items():
         by_tf[tf] = {
             "count":       len(grp),
+            "closed":      sum(1 for s in grp if s.get("outcome") in ("WIN", "LOSS")),
             "win_rate_pct": _win_rate(grp),
         }
 
@@ -204,6 +206,7 @@ def run() -> dict[str, Any]:
     for bias, grp in _group_by(signals, "bias").items():
         by_bias[bias] = {
             "count":        len(grp),
+            "closed":       sum(1 for s in grp if s.get("outcome") in ("WIN", "LOSS")),
             "win_rate_pct": _win_rate(grp),
             "avg_pnl_pct":  _avg_pnl([s for s in grp if s.get("outcome") in ("WIN","LOSS")]),
         }
