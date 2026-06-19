@@ -1,97 +1,113 @@
 {
-  "erstellt_am": "2026-06-19T09:34:46.405829+00:00",
+  "erstellt_am": "2026-06-19T15:16:32.503322+00:00",
   "gesamt": {
-    "gesamt_signale": 537,
-    "geschlossen": 402,
-    "offen": 46,
+    "gesamt_signale": 587,
+    "geschlossen": 404,
+    "offen": 94,
     "abgelaufen": 89,
-    "win_rate_pct": 64.93,
-    "win_rate_pct_gewichtet": 62.16,
-    "win_rate_pct_30d": 66.52,
-    "n_30d": 227,
-    "avg_pnl_pct": 0.613,
-    "avg_pnl_pct_30d": 0.189,
-    "avg_rr": 1.285,
-    "current_streak": -9,
+    "win_rate_pct": 65.1,
+    "win_rate_pct_gewichtet": 62.54,
+    "win_rate_pct_30d": 66.67,
+    "n_30d": 228,
+    "avg_pnl_pct": 0.619,
+    "avg_pnl_pct_30d": 0.196,
+    "avg_rr": 1.365,
+    "current_streak": 2,
     "max_loss_streak": 16,
-    "api_calls": 510,
-    "api_win_rate_pct": 50.98,
-    "local_model_calls": 27,
-    "api_calls_saved": 27
+    "api_calls": 555,
+    "api_closed": 392,
+    "api_win_rate_pct": 66.84,
+    "api_win_yield_pct": 47.21,
+    "local_model_calls": 32,
+    "api_calls_saved": 32
   },
   "nach_setup_typ": {
     "BOS": {
-      "count": 131,
+      "count": 151,
+      "closed": 113,
       "win_rate_pct": 65.49,
       "avg_pnl_pct": 0.355,
-      "avg_rr": 2.045
+      "avg_rr": 2.039
     },
     "Volume": {
       "count": 15,
+      "closed": 15,
       "win_rate_pct": 66.67,
       "avg_pnl_pct": 2.54,
       "avg_rr": 0.607
     },
     "EQH": {
-      "count": 169,
-      "win_rate_pct": 71.65,
-      "avg_pnl_pct": 0.708,
-      "avg_rr": 0.871
+      "count": 184,
+      "closed": 129,
+      "win_rate_pct": 72.09,
+      "avg_pnl_pct": 0.724,
+      "avg_rr": 0.987
     },
     "CHoCH": {
       "count": 47,
+      "closed": 42,
       "win_rate_pct": 66.67,
       "avg_pnl_pct": 1.455,
       "avg_rr": 0.821
     },
     "Zone": {
-      "count": 70,
+      "count": 80,
+      "closed": 26,
       "win_rate_pct": 15.38,
       "avg_pnl_pct": -2.813,
-      "avg_rr": 1.968
+      "avg_rr": 1.972
     },
     "EQL": {
-      "count": 105,
+      "count": 110,
+      "closed": 79,
       "win_rate_pct": 68.35,
       "avg_pnl_pct": 1.143,
-      "avg_rr": 0.852
+      "avg_rr": 0.965
     }
   },
   "nach_timeframe": {
     "4h": {
-      "count": 208,
+      "count": 228,
+      "closed": 184,
       "win_rate_pct": 52.17
     },
     "30m": {
       "count": 206,
+      "closed": 157,
       "win_rate_pct": 90.45
     },
     "15m": {
-      "count": 58,
-      "win_rate_pct": 46.67
+      "count": 70,
+      "closed": 32,
+      "win_rate_pct": 50.0
     },
     "1h": {
-      "count": 48,
+      "count": 61,
+      "closed": 31,
       "win_rate_pct": 29.03
     },
     "1d": {
-      "count": 17,
+      "count": 22,
+      "closed": 0,
       "win_rate_pct": 0.0
     }
   },
   "nach_bias": {
     "bullish": {
-      "count": 151,
-      "win_rate_pct": 39.17,
-      "avg_pnl_pct": -0.554
+      "count": 182,
+      "closed": 122,
+      "win_rate_pct": 40.16,
+      "avg_pnl_pct": -0.516
     },
     "neutral": {
       "count": 239,
+      "closed": 190,
       "win_rate_pct": 76.32,
       "avg_pnl_pct": 1.087
     },
     "bearish": {
-      "count": 147,
+      "count": 166,
+      "closed": 92,
       "win_rate_pct": 75.0,
       "avg_pnl_pct": 1.156
     }

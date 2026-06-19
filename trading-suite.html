@@ -406,7 +406,7 @@ canvas{display:block;width:100%;}
         <button class="lv-zoom" onclick="lvZoom(1)"  title="Hineinzoomen (+)">+</button>
         <div class="lv-sep"></div>
         <button class="lv-ind on" id="ind-ema21"  onclick="lvInd('ema21',this)">EMA 21</button>
-        <button class="lv-ind on" id="ind-ema55"  onclick="lvInd('ema55',this)">EMA 55</button>
+        <button class="lv-ind"    id="ind-ema55"  onclick="lvInd('ema55',this)">EMA 55</button>
         <button class="lv-ind on" id="ind-ema200" onclick="lvInd('ema200',this)">EMA 200</button>
         <button class="lv-ind on" id="ind-tl"     onclick="lvInd('tl',this)"  title="Trendlinien">Trendl.</button>
         <button class="lv-ind on" id="ind-sig"    onclick="lvInd('sig',this)" title="Bot-Signale">Sig.</button>
@@ -414,11 +414,11 @@ canvas{display:block;width:100%;}
         <!-- Overlay-Toggles (kompakte Button-Form) -->
         <button class="lv-ind"    id="lv-autoTgl"  onclick="lvToggleAuto()"                   title="Auto KI: analysiert jede neue Kerze automatisch">Auto KI</button>
         <button class="lv-ind on" id="bot-sig-tgl" onclick="lvToggleBotSigs(this)" title="Bot-Signale im Chart anzeigen" style="display:inline-flex;align-items:center;gap:4px;"><span class="dot di" id="bot-sig-dot"></span>◆ Bot</button>
-        <button class="lv-ind on" id="fvg-tgl"     onclick="lvToggleFvg(this)"                title="Fair Value Gaps &amp; Order Blocks">FVG</button>
-        <button class="lv-ind on" id="poi-tgl"     onclick="lvTogglePOI(this)"                title="Gelernte POI-Zonen (mit Wahrscheinlichkeit)">POI</button>
+        <button class="lv-ind"    id="fvg-tgl"     onclick="lvToggleFvg(this)"                title="Fair Value Gaps &amp; Order Blocks">FVG</button>
+        <button class="lv-ind"    id="poi-tgl"     onclick="lvTogglePOI(this)"                title="Gelernte POI-Zonen (mit Wahrscheinlichkeit)">POI</button>
         <button class="lv-ind on" id="macd-tgl"    onclick="lvToggleFeature('macd',this)"     title="MACD-Panel">MACD</button>
-        <button class="lv-ind on" id="sess-tgl"    onclick="lvToggleFeature('sessions',this)" title="London / NY Session-Highlights">Sess</button>
-        <button class="lv-ind on" id="pat-tgl"     onclick="lvToggleFeature('patterns',this)" title="Kerzen-Muster (Doji, Hammer, Engulfing)">Muster</button>
+        <button class="lv-ind"    id="sess-tgl"    onclick="lvToggleFeature('sessions',this)" title="London / NY Session-Highlights">Sess</button>
+        <button class="lv-ind"    id="pat-tgl"     onclick="lvToggleFeature('patterns',this)" title="Kerzen-Muster (Doji, Hammer, Engulfing)">Muster</button>
         <div class="lv-sep"></div>
         <!-- Paper Trader -->
         <button class="lv-ind on" id="pt-tgl" onclick="ptToggleBtn()" title="Paper Trading Ein/Aus" style="display:inline-flex;align-items:center;gap:4px;">
@@ -4644,7 +4644,10 @@ class LiveChart {
     this.P_TOP    = 8;
 
     // Indicator toggles
-    this.show = { ema21:true, ema55:true, ema200:true, tl:true, sig:true, bot:true, fvg:true, poi:true, sessions:true, volProfile:true, patterns:true, macd:true };
+    // Übersichtliche Default-Layer: nur die Essenz (Preis + EMA 21/200 + Trendlinien
+    // + Signale + MACD). Busy-Layer (EMA 55, FVG, POI, Sessions, Muster, Vol-Profil)
+    // sind aus, aber per Toolbar 1 Klick entfernt — verhindert Überladung beim Laden.
+    this.show = { ema21:true, ema55:false, ema200:true, tl:true, sig:true, bot:true, fvg:false, poi:false, sessions:false, volProfile:false, patterns:false, macd:true };
 
     // Crosshair
     this.mX = null; this.mY = null;
@@ -5036,16 +5039,22 @@ class LiveChart {
   _drawSignals(pr,y0,ph) {
     const ctx=this.ctx, {lo,hi}=pr;
 
-    // ── Schritt 1: TP/SL-Zonen für alle sichtbaren Signale ───────
+    // ── Schritt 1: TP/SL-Zone NUR fürs jüngste sichtbare Signal ──
+    // Verhindert die "Box-Wand": bei mehreren Signalen würden sich Zonen,
+    // Linien und Labels überlagern. Ältere Signale bleiben als Marker (Schritt 2).
+    let _latest = null;
     this.signals.forEach(s=>{
       if(s.idx<this.startI||s.idx>=this.endI) return;
       if(!s.sl||!s.tp) return;
-      const c=this.candles[s.idx]; if(!c) return;
+      if(!_latest || s.idx > _latest.idx) _latest = s;
+    });
+    if(_latest){
+      const s = _latest;
+      const c = this.candles[s.idx];
       const isL=s.direction==='long';
       const x0 = this.toX(s.idx);
       const x1 = this.CW - 56;   // rechte Kante (vor Preisskala)
-      if(x1<=x0) return;
-
+      if(c && x1>x0){
       const entryY = this.toY(s.entryPrice||c.c, y0,ph,lo,hi);
       const slY    = this.toY(s.sl, y0,ph,lo,hi);
       const tpY    = this.toY(s.tp, y0,ph,lo,hi);
@@ -5088,7 +5097,8 @@ class LiveChart {
       ctx.fillText('TP  $'+s.tp.toFixed(2), x1-2, tpY+(tpY<entryY?-3:11));
       ctx.fillStyle = 'rgba(255,255,255,0.35)';
       ctx.fillText('$'+((s.entryPrice||c.c).toFixed(2)), x1-2, entryY-3);
-    });
+      }
+    }
 
     // ── Schritt 2: Signal-Dreiecke (obendrauf) ────────────────────
     this.signals.forEach(s=>{
@@ -5134,6 +5144,12 @@ class LiveChart {
   _drawBotSignals(pr, y0, ph) {
     if (!this.botSignals?.length) return;
     const ctx = this.ctx, {lo, hi} = pr;
+    // TP/SL-Zone nur fürs jüngste aktive-TF-Signal (Declutter, s. _drawSignals)
+    let _botZoneIdx = -1;
+    for (const s of this.botSignals) {
+      if (s.idx < this.startI || s.idx >= this.endI) continue;
+      if (s.sl && s.tp && !s.otherTf && s.idx > _botZoneIdx) _botZoneIdx = s.idx;
+    }
     for (const s of this.botSignals) {
       if (s.idx < this.startI || s.idx >= this.endI) continue;
       const c = this.candles[s.idx]; if (!c) continue;
@@ -5146,7 +5162,7 @@ class LiveChart {
                 : '#a78bfa';
       // TP/SL zones (subtle, behind client signals) — nur für den aktiven TF,
       // damit Fremd-TF-Signale den Chart nicht mit Boxen überladen
-      if (s.sl && s.tp && x1 > x && !s.otherTf) {
+      if (s.sl && s.tp && x1 > x && !s.otherTf && s.idx === _botZoneIdx) {
         const eY = this.toY(s.entryPrice||c.c, y0,ph,lo,hi);
         const sY = this.toY(s.sl, y0,ph,lo,hi);
         const tY = this.toY(s.tp, y0,ph,lo,hi);
@@ -6554,7 +6570,7 @@ class AutoSignalEngine {
 
 // ── Live Page Controller ──────────────────────────────────────────
 let lvChart=null, lvDM=null, lvAE=null, lvInterval_='4h';
-let lvInds={ema21:true,ema55:true,ema200:true,tl:true,sig:true};
+let lvInds={ema21:true,ema55:false,ema200:true,tl:true,sig:true};
 
 function lvInit() {
   if (lvChart) { setTimeout(()=>lvChart._resize(),50); return; }
