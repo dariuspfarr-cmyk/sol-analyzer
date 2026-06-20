@@ -362,6 +362,38 @@ canvas{display:block;width:100%;}
 .pred-result{padding:14px;border-radius:5px;text-align:center;}
 .train-log{font-family:'Courier New',monospace;font-size:10px;color:var(--muted);height:100px;overflow-y:auto;background:var(--s2);border-radius:4px;padding:8px;line-height:1.6;}
 @media(max-width:1100px){.lab-grid,.lab-grid3{grid-template-columns:1fr;}}
+
+/* ══ MOBILE / TOUCH-OPTIMIERUNG ═══════════════════════════════ */
+@media(max-width:768px){
+  /* Live-Bereich scrollbar: Chart oben, Seitenpanel (Signale/Paper/Log) darunter
+     statt es zu verstecken. main{overflow:auto} übernimmt das Scrollen. */
+  #sec-live{ height:auto; overflow:visible; }
+  .lv-layout{ display:flex; flex-direction:column; }
+  .lv-chart-col{ border-right:none; }
+  .lv-canvas-wrap{ height:60vh; min-height:320px; flex:none; }
+  /* Seitenpanel NICHT verstecken (überschreibt die 1100px-Regel), sondern stapeln */
+  .lv-side{ display:flex !important; width:auto; border-top:1px solid #1a1a22; }
+  .lv-pane.on{ max-height:75vh; }
+  /* Touch-freundliche Toolbar: höhere Tap-Targets, weiches Scrollen */
+  .lv-toolbar{ height:auto; min-height:46px; padding:6px 10px; gap:6px;
+               -webkit-overflow-scrolling:touch; }
+  .lv-ind{ padding:7px 11px; font-size:11px; }
+  .lv-ibtn{ padding:7px 10px; font-size:12px; }
+  .lv-legend-btn{ padding:6px 10px; }
+  .lv-legend-grid{ grid-template-columns:1fr; }
+  /* Kopf/Navigation kompakter + horizontal scrollbar bei Überlauf */
+  header{ padding:0 12px; gap:8px; overflow-x:auto; }
+  .mnav button{ padding:13px 9px; }
+  .snav{ -webkit-overflow-scrolling:touch; }
+  .pg{ padding:12px 14px; }
+}
+@media(max-width:480px){
+  .lv-canvas-wrap{ height:54vh; min-height:280px; }
+  .lv-pair{ font-size:13px; }
+  .lv-price-disp{ font-size:14px; }
+  .pg{ padding:10px 11px; }
+  .logo{ letter-spacing:2px; }
+}
 </style>
 </head>
 <body>
@@ -4761,6 +4793,64 @@ class LiveChart {
     }, {passive:false});
 
     el.addEventListener('dblclick', () => { this.candleW = 9; this.offsetRight = 8; this.render(); });
+
+    // ── Touch (Mobile): 1 Finger = Pan + Crosshair, 2 Finger = Pinch-Zoom ──
+    let _tPan = null, _tPinch = null;
+    const _pinchInfo = t => {
+      const r = el.getBoundingClientRect();
+      return { x:(t[0].clientX + t[1].clientX) / 2 - r.left,
+               d:Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY) };
+    };
+    el.addEventListener('touchstart', e => {
+      const r = el.getBoundingClientRect();
+      if (e.touches.length === 1) {
+        _tPan = { x:e.touches[0].clientX, off:this.offsetRight };
+        _tPinch = null;
+        this.mX = e.touches[0].clientX - r.left;
+        this.mY = e.touches[0].clientY - r.top;
+        this.render();
+      } else if (e.touches.length === 2) {
+        _tPinch = { ..._pinchInfo(e.touches), cw:this.candleW };
+        _tPan = null; this.mX = null;
+      }
+    }, {passive:true});
+    el.addEventListener('touchmove', e => {
+      if (e.touches.length === 1 && _tPan) {
+        e.preventDefault();
+        const r  = el.getBoundingClientRect();
+        const dx = e.touches[0].clientX - _tPan.x;
+        const n  = this.candles.length;
+        this.offsetRight = Math.max(-50, Math.min(n - 5, _tPan.off + dx / this.candleW));
+        this.mX = e.touches[0].clientX - r.left;
+        this.mY = e.touches[0].clientY - r.top;
+        this.render();
+      } else if (e.touches.length === 2 && _tPinch) {
+        e.preventDefault();
+        const info  = _pinchInfo(e.touches);
+        const ratio = info.d / Math.max(1, _tPinch.d);
+        const oldCW = this.candleW;
+        const oldStartI = this.startI;
+        this.candleW = Math.max(3, Math.min(40, _tPinch.cw * ratio));
+        // Anker: Kerze unter dem Pinch-Mittelpunkt behält ihre Position
+        if (this.candles.length) {
+          const anchorCandle = oldStartI + _tPinch.x / oldCW;
+          const newVisN      = Math.floor(this.CW / this.candleW);
+          const newStartI    = anchorCandle - _tPinch.x / this.candleW;
+          this.offsetRight   = Math.round(Math.max(-50, Math.min(this.candles.length - 5,
+            this.candles.length - newStartI - newVisN)));
+        }
+        this.render();
+      }
+    }, {passive:false});
+    const _touchEnd = e => {
+      if (e.touches.length === 0) { _tPan = null; _tPinch = null; this.mX = null; this.render(); }
+      else if (e.touches.length === 1) {
+        _tPinch = null;
+        _tPan = { x:e.touches[0].clientX, off:this.offsetRight };
+      }
+    };
+    el.addEventListener('touchend', _touchEnd);
+    el.addEventListener('touchcancel', _touchEnd);
   }
 
   get CW()   { return (this.W||800) - this.P_RIGHT; }
