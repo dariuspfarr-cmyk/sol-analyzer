@@ -20,7 +20,9 @@ header{height:42px;border-bottom:1px solid var(--b);display:flex;align-items:cen
 .logo{font-size:14px;font-weight:700;letter-spacing:3.5px;color:#fff;text-transform:uppercase;}
 .logo span{color:var(--muted);font-weight:400;}
 .mnav{margin-left:auto;display:flex;gap:1px;}
-.mnav button{background:none;border:none;border-bottom:2px solid transparent;color:var(--muted);font-size:10.5px;font-weight:600;letter-spacing:1.2px;text-transform:uppercase;padding:13px 13px;cursor:pointer;transition:color .15s;}
+.mnav button{background:none;border:none;border-bottom:2px solid transparent;color:var(--muted);font-size:10.5px;font-weight:600;letter-spacing:1.2px;text-transform:uppercase;padding:13px 13px;cursor:pointer;transition:color .15s;display:inline-flex;align-items:center;gap:7px;}
+.mn-ic{font-size:12px;line-height:1;opacity:.8;}
+.mnav button.on .mn-ic{opacity:1;}
 .mnav button:hover{color:var(--dim);}
 .mnav button.on{color:#fff;border-bottom-color:#fff;}
 
@@ -249,9 +251,11 @@ canvas{display:block;width:100%;}
 .lv-tabs { display:flex; border-bottom:1px solid #14141c; flex-shrink:0; }
 .lv-tab { flex:1; background:none; border:none; border-bottom:2px solid transparent;
   color:#444; font-size:10px; font-weight:700; letter-spacing:.6px; text-transform:uppercase;
-  padding:8px 4px; cursor:pointer; transition:color .15s; }
+  padding:8px 4px; cursor:pointer; transition:color .15s;
+  display:inline-flex; align-items:center; justify-content:center; gap:6px; }
 .lv-tab:hover { color:#888; }
 .lv-tab.on { color:#fff; border-bottom-color:#fff; }
+.lt-ic { font-size:11px; line-height:1; opacity:.85; }
 /* Tab-Panes */
 .lv-pane { display:none; flex-direction:column; flex:1; overflow:hidden; }
 .lv-pane.on { display:flex; }
@@ -391,12 +395,14 @@ canvas{display:block;width:100%;}
     padding-bottom:env(safe-area-inset-bottom,0);
   }
   .mnav button{
-    flex:1; padding:11px 2px 10px; font-size:9px; letter-spacing:.3px;
-    text-align:center; white-space:nowrap;
+    flex:1; flex-direction:column; gap:3px; padding:7px 2px 8px;
+    font-size:8.5px; letter-spacing:.3px; text-align:center; white-space:nowrap;
     border-bottom:none; border-top:2px solid transparent;
   }
+  .mnav .mn-ic{ font-size:16px; opacity:.75; }
   .mnav button.on{ color:#fff; border-top-color:#fff; border-bottom:none;
     background:rgba(255,255,255,.05); }
+  .mnav button.on .mn-ic{ opacity:1; }
   header{ padding:0 14px; }
   /* Inhalt frei von der Bottom-Bar halten (inkl. iPhone Safe-Area) */
   main{ padding-bottom:calc(56px + env(safe-area-inset-bottom,0)); }
@@ -447,11 +453,11 @@ canvas{display:block;width:100%;}
 <header>
   <div class="logo">SOL <span>/</span> SUITE</div>
   <nav class="mnav">
-    <button onclick="showSec('live')">⬤ Live</button>
-    <button onclick="showSec('bot')">◎ Bot</button>
-    <button class="on" onclick="showSec('strategy')">Strategie</button>
-    <button onclick="showSec('backtest')">Backtester</button>
-    <button onclick="showSec('journal')">Journal</button>
+    <button onclick="showSec('live')"><span class="mn-ic">⬤</span><span class="mn-lb">Live</span></button>
+    <button onclick="showSec('bot')"><span class="mn-ic">◎</span><span class="mn-lb">Bot</span></button>
+    <button class="on" onclick="showSec('strategy')"><span class="mn-ic">◈</span><span class="mn-lb">Strategie</span></button>
+    <button onclick="showSec('backtest')"><span class="mn-ic">▦</span><span class="mn-lb">Backtest</span></button>
+    <button onclick="showSec('journal')"><span class="mn-ic">▤</span><span class="mn-lb">Journal</span></button>
   </nav>
 </header>
 
@@ -724,11 +730,11 @@ canvas{display:block;width:100%;}
     <div class="lv-side">
       <!-- Tab Bar -->
       <div class="lv-tabs">
-        <button class="lv-tab on" onclick="lvTab('signals',this)">Signale</button>
-        <button class="lv-tab"    onclick="lvTab('paper',this)">Paper</button>
-        <button class="lv-tab"    onclick="lvTab('log',this)">Log</button>
-        <button class="lv-tab"    onclick="lvTab('market',this)" id="lv-tab-market">Markt</button>
-        <button class="lv-tab"    onclick="lvTab('bot',this);evoLogRefresh()">Bot</button>
+        <button class="lv-tab on" onclick="lvTab('signals',this)"><span class="lt-ic">◆</span><span class="lt-lb">Signale</span></button>
+        <button class="lv-tab"    onclick="lvTab('paper',this)"><span class="lt-ic">▣</span><span class="lt-lb">Paper</span></button>
+        <button class="lv-tab"    onclick="lvTab('log',this)"><span class="lt-ic">≡</span><span class="lt-lb">Log</span></button>
+        <button class="lv-tab"    onclick="lvTab('market',this)" id="lv-tab-market"><span class="lt-ic">◴</span><span class="lt-lb">Markt</span></button>
+        <button class="lv-tab"    onclick="lvTab('bot',this);evoLogRefresh()"><span class="lt-ic">◎</span><span class="lt-lb">Bot</span></button>
       </div>
 
       <!-- Pane: Signale -->
