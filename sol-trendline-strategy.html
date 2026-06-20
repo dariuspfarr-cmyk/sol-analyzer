@@ -152,8 +152,10 @@
   @media(max-width:900px){
     .grid-2,.grid-3 { grid-template-columns: 1fr; }
     .page { padding: 16px; }
-    .tabs { padding: 10px 16px 0; }
+    .tabs { padding: 10px 16px 0; overflow-x:auto; }
     header { padding: 14px 16px; }
+    /* Tabellen horizontal scrollbar machen statt die Seite zu sprengen */
+    table { display:block; overflow-x:auto; white-space:nowrap; -webkit-overflow-scrolling:touch; }
   }
 </style>
 </head>
