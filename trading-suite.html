@@ -244,7 +244,10 @@ canvas{display:block;width:100%;}
 .lv-mkt-detail .mkt-row { display:flex; justify-content:space-between; border-bottom:1px solid #12121e; padding:4px 0; }
 .lv-mkt-detail .mkt-label { color:#555; }
 .lv-mkt-detail .mkt-insight { color:#ff9800; font-size:11px; padding:2px 0; }
-#lv-canvas { position:absolute; inset:0; display:block; }
+/* touch-action:pan-y am Canvas SELBST (er liegt oben, empfängt die Touches;
+   touch-action wird nicht vom Wrap vererbt): vertikal scrollt die Seite nativ,
+   horizontal/Pinch bleibt dem Chart-JS überlassen. */
+#lv-canvas { position:absolute; inset:0; display:block; touch-action:pan-y; }
 /* Right panel */
 .lv-side { display:flex; flex-direction:column; background:#08080d; overflow:hidden; }
 /* Tab-Bar */
@@ -386,6 +389,10 @@ canvas{display:block;width:100%;}
 
 /* ══ MOBILE / TOUCH-OPTIMIERUNG ═══════════════════════════════ */
 @media(max-width:768px){
+  /* main bleibt der Scroller, aber mit nativem Touch-Momentum (sonst ruckelig
+     auf iOS) und ohne Scroll-Chaining-Wackeln. */
+  main { -webkit-overflow-scrolling:touch; overscroll-behavior:contain; }
+
   /* ─ Haupt-Navigation als feste Bottom-Tab-Bar: mobil-nativ, mit dem Daumen
        erreichbar, immer sichtbar. Jede Sektion ein Tipp entfernt. ─ */
   .mnav{
@@ -427,9 +434,13 @@ canvas{display:block;width:100%;}
   .lv-pane.on{ flex:none; max-height:none; overflow:visible; }
   .lv-tab{ padding:11px 4px; font-size:12px; }      /* größere Panel-Tabs */
 
-  /* ─ Touch-freundliche Chart-Toolbar ─ */
-  .lv-toolbar{ height:auto; min-height:46px; padding:6px 10px; gap:6px;
-               -webkit-overflow-scrolling:touch; }
+  /* ─ Touch-freundliche Chart-Toolbar: EINE saubere Zeile, horizontal scrollbar.
+       Nichts darf schrumpfen/umbrechen (sonst stapeln sich z. B. die Timeframe-
+       Buttons vertikal = das „verbuckte" Layout). ─ */
+  .lv-toolbar{ height:46px; min-height:46px; padding:0 10px; gap:6px;
+               flex-wrap:nowrap; -webkit-overflow-scrolling:touch; }
+  .lv-toolbar > *{ flex-shrink:0; }
+  #lv-ibtns{ display:flex; flex-shrink:0; gap:3px; }
   .lv-ind{ padding:7px 11px; font-size:11px; }
   .lv-ibtn{ padding:7px 11px; font-size:12px; }
   .lv-zoom{ padding:7px 11px; }
@@ -6846,15 +6857,18 @@ function lvInit() {
 
   // Animations-Loop während des Seiten-Scrollens pausieren → flüssiges,
   // ruckelfreies Scrollen (der Canvas rendert sonst 60fps gegen den Scroll).
-  const _main = document.querySelector('main');
-  if (_main && !_main._lvScrollHook) {
-    _main._lvScrollHook = true;
+  // Mobile scrollt das Dokument (window), Desktop den internen main → beide hooken.
+  if (!window._lvScrollHook) {
+    window._lvScrollHook = true;
     let _scrollT;
-    _main.addEventListener('scroll', () => {
+    const _onScroll = () => {
       if (lvChart) lvChart.setVisible(false);
       clearTimeout(_scrollT);
       _scrollT = setTimeout(() => { if (lvChart) lvChart.setVisible(true); }, 180);
-    }, {passive:true});
+    };
+    window.addEventListener('scroll', _onScroll, {passive:true});
+    const _main = document.querySelector('main');
+    if (_main) _main.addEventListener('scroll', _onScroll, {passive:true});
   }
   lvAE    = new AutoSignalEngine(lvChart);
   lvDM    = new LiveDataManager(lvChart);
