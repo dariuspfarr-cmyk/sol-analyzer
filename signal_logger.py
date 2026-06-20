@@ -97,6 +97,7 @@ def _init_db(conn: sqlite3.Connection) -> None:
             time_of_day       INTEGER,                     -- Stunde 0-23
             day_of_week       INTEGER,                     -- 0=Mo … 6=So
             entry_candle_ts   TEXT,                        -- Timestamp der Einstiegskerze
+            paper_traded      INTEGER  DEFAULT 0,          -- 0=nein 1=aktiv 2=abgeschlossen
             -- Outcome (wird nachträglich gefüllt)
             outcome           TEXT     DEFAULT NULL,       -- WIN/LOSS/EXPIRED
             pnl_pct           REAL     DEFAULT NULL,
