@@ -1,0 +1,103 @@
+{
+  "generated_at": "2026-06-20T12:33:02.550223+00:00",
+  "items": [
+    {
+      "id": "7f9b89582e",
+      "category": "trading",
+      "priority": "P1",
+      "title": "Setup «Zone» verliert Geld (WR 10%, Ø -3.39%)",
+      "detail": "39 geschlossene Signale, Win-Rate 10.3%, Ø-PnL -3.39%.",
+      "action": "Gewicht von «Zone» in config.json deutlich senken oder Setup gezielt filtern (z. B. nur in passendem Markt-Kontext zulassen). Win-Rate < 40% bedeutet aktiver Kapitalverlust.",
+      "source": "performance_report.json",
+      "file": "",
+      "first_seen": "2026-06-18T19:38:26.941114+00:00",
+      "occurrences": 34,
+      "status": "done",
+      "last_seen": "2026-06-20T12:33:02.550223+00:00"
+    },
+    {
+      "id": "8af0bb8ad1",
+      "category": "trading",
+      "priority": "P2",
+      "title": "Timeframe 1h schwach (WR 37%)",
+      "detail": "38 geschlossene Signale auf 1h, Win-Rate nur 36.8%.",
+      "action": "Schwellen/Filter für 1h verschärfen oder 1h niedriger gewichten; prüfen ob die SMC-Parameter für 1h sinnvoll skaliert sind.",
+      "source": "performance_report.json",
+      "file": "",
+      "first_seen": "2026-06-18T19:38:26.941114+00:00",
+      "occurrences": 34,
+      "status": "done",
+      "last_seen": "2026-06-20T12:33:02.550223+00:00"
+    },
+    {
+      "id": "21ffb57f84",
+      "category": "trading",
+      "priority": "P2",
+      "title": "Ø Risk:Reward niedrig (1.41)",
+      "detail": "Durchschnittliches R:R aller Signale ist 1.41 (Ziel ≥ 1.5).",
+      "action": "TP/SL-Ableitung in signal_logger._derive_sl_tp prüfen — TP zu nah oder SL zu weit. Höheres R:R macht selbst niedrigere Win-Rates profitabel.",
+      "source": "performance_report.json",
+      "file": "",
+      "first_seen": "2026-06-18T19:38:26.941114+00:00",
+      "occurrences": 34,
+      "status": "done",
+      "last_seen": "2026-06-20T12:33:02.550223+00:00"
+    },
+    {
+      "id": "4b06a925cd",
+      "category": "trading",
+      "priority": "P1",
+      "title": "Lange Verlustserie (aktuell -27, max 27)",
+      "detail": "Aktuelle Serie -27, längste Verlustserie 27.",
+      "action": "Risiko-Throttle/Circuit-Breaker prüfen; evtl. nach N Verlusten in Folge pausieren oder Strategie-Profil wechseln (active_strategy.json).",
+      "source": "performance_report.json",
+      "file": "",
+      "first_seen": "2026-06-18T19:38:26.941114+00:00",
+      "occurrences": 34,
+      "status": "done",
+      "last_seen": "2026-06-20T12:33:02.550223+00:00"
+    },
+    {
+      "id": "ccb79dfaa6",
+      "category": "trading",
+      "priority": "P1",
+      "title": "Win-Rate sinkt (72% → 61%)",
+      "detail": "Mittlere Win-Rate fiel von 72.2% auf zuletzt 60.9% (aktuell 58.9%).",
+      "action": "WIN-RATE IST DAS HAUPTZIEL. Regime-Wechsel prüfen (Reversal- vs Trend-Setups), Selektivität erhöhen, verlierende Setups/Regime härter filtern. Ggf. backtester.py nutzen, um optimale Schwellen zu finden.",
+      "source": "strategy_evolution.json",
+      "file": "",
+      "first_seen": "2026-06-19T11:30:35.096632+00:00",
+      "occurrences": 19,
+      "status": "open",
+      "last_seen": "2026-06-20T12:33:02.550223+00:00"
+    },
+    {
+      "id": "87a45b8065",
+      "category": "trading",
+      "priority": "P2",
+      "title": "Win-Rate unter Ziel (59% < 60%)",
+      "detail": "Aktuelle Win-Rate 58.9% liegt unter dem Zielwert 60%.",
+      "action": "Selektiver werden: nur A+-Setups zulassen (Trend-Folge im Trend, Confluence ≥2 Trigger, hohe Konfidenz). Schwächste Setups/TFs/Bias im aktuellen Regime drosseln.",
+      "source": "strategy_evolution.json",
+      "file": "",
+      "first_seen": "2026-06-20T10:32:58.304074+00:00",
+      "occurrences": 2,
+      "status": "open",
+      "last_seen": "2026-06-20T12:33:02.550223+00:00"
+    },
+    {
+      "id": "93d9bb9171",
+      "category": "quality",
+      "priority": "P3",
+      "title": "paper_trader.py ist sehr groß (2347 Zeilen)",
+      "detail": "paper_trader.py hat 2347 Zeilen — schwer zu überblicken/testen.",
+      "action": "In thematische Module aufteilen (z. B. Execution/Sizing/Indikatoren), wie bereits bei pt_indicators.py begonnen.",
+      "source": "code-metrics",
+      "file": "paper_trader.py",
+      "first_seen": "2026-06-18T19:38:26.941114+00:00",
+      "occurrences": 34,
+      "status": "wontfix",
+      "last_seen": "2026-06-20T12:33:02.550223+00:00"
+    }
+  ]
+}

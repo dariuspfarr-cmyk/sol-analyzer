@@ -1,52 +1,28 @@
-# ── Python ────────────────────────────────────────────────
-.venv/
-__pycache__/
-*.pyc
-*.pyo
-.mypy_cache/
-.ruff_cache/
-
-# ── Node / ESLint ─────────────────────────────────────────
-node_modules/
-npm-debug.log*
-
-# ── Laufzeit-Daten des Bots (ändern sich ständig) ─────────
-*.db
-*.db-journal
-*.db-wal
-*.db-shm
-state.json
-trades.csv
-trades.json
-daily_performance.json
-error.log
-*.log
-*.jsonl
-api_costs.jsonl
-routing_log.jsonl
-
-# ── Caches ────────────────────────────────────────────────
-research_cache.json
-bull_run_cache.json
-poi_log.json
-poi_stats.json
-
-# ── Auto-generierter Verbesserungs-Backlog (Laufzeit-Artefakt) ──
-# Der Mechanismus (improvement_scanner.py, CLAUDE.md) ist versioniert;
-# die generierten Backlog-Dateien nicht (ändern sich bei jedem Scan).
-IMPROVEMENTS.md
-improvements.json
-
-# ── Generierte Charts ─────────────────────────────────────
-charts/
-*.png
-
-# ── Secrets / lokale Umgebung ─────────────────────────────
-# .env kann künftig Secrets enthalten → nie committen.
-# Die Vorlage .env.example bleibt versioniert.
+﻿# Secrets
 .env
 
-# ── OS / Editor ───────────────────────────────────────────
-Thumbs.db
-.DS_Store
-.vscode/*.local
+# Datenbank
+*.db
+*.db.old
+*.sqlite
+*.sqlite3
+
+# Lerndaten / generierte Dateien (ändern sich bei jedem Lauf)
+*.pkl
+active_strategy.json
+backtest_weights.json
+config_backup.json
+model_report.json
+performance_report.json
+rule_performance.json
+strategy_evolution.json
+strategy_rules.json
+routing_report.json
+
+# Python
+venv/
+__pycache__/
+*.pyc
+
+# Charts/Output
+*.png
