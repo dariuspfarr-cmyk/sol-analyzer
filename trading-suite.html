@@ -199,6 +199,23 @@ canvas{display:block;width:100%;}
 .lv-ind:hover { color:#bbb; border-color:#3a3a4a; }
 .lv-ind.on { color:#1cd4a8; border-color:#0e6b58; background:rgba(8,153,129,.16); }
 .lv-ind.on:hover { color:#3ee6bd; border-color:#12876f; }
+/* ── Layer-Dropdown: räumt die überladene Toolbar auf ── */
+.lv-dropdown { position:relative; display:inline-flex; flex-shrink:0; }
+#lv-layers-btn.on { color:#fff; border-color:#555; background:#1a1a2e; }
+.lv-layers-panel {
+  /* fixed statt absolute: entkommt dem overflow-x:auto-Clipping der Toolbar.
+     Position (top/left) wird beim Öffnen per JS gesetzt und im Viewport gehalten. */
+  position:fixed; top:60px; left:12px; z-index:500;
+  display:none; flex-direction:column; gap:11px;
+  width:min(236px, calc(100vw - 24px));
+  background:#0c0c12; border:1px solid #20202c; border-radius:10px;
+  padding:12px; box-shadow:0 14px 38px rgba(0,0,0,.65);
+}
+.lv-layers-panel.open { display:flex; }
+.lv-lp-group { display:flex; flex-wrap:wrap; gap:6px; }
+.lv-lp-title { width:100%; font-size:9px; font-weight:700; letter-spacing:.7px;
+  text-transform:uppercase; color:#5a5a70; margin-bottom:1px; }
+.lv-lp-group .lv-ind { font-size:11px; padding:5px 10px; }
 .lv-zoom { background:none; border:1px solid #252535; color:#666; font-size:14px; font-weight:700; width:24px; height:24px; border-radius:3px; cursor:pointer; transition:all .15s; display:inline-flex; align-items:center; justify-content:center; padding:0; line-height:1; flex-shrink:0; }
 .lv-zoom:hover { color:#ccc; border-color:#444; background:#14141c; }
 .lv-zoom:active { background:#1e1e2e; transform:scale(.93); }
@@ -465,22 +482,35 @@ canvas{display:block;width:100%;}
         <button class="lv-zoom" onclick="lvZoom(-1)" title="Herauszoomen (−)">−</button>
         <button class="lv-zoom" onclick="lvZoom(1)"  title="Hineinzoomen (+)">+</button>
         <div class="lv-sep"></div>
-        <button class="lv-ind on" id="ind-ema21"  onclick="lvInd('ema21',this)">EMA 21</button>
-        <button class="lv-ind"    id="ind-ema55"  onclick="lvInd('ema55',this)">EMA 55</button>
-        <button class="lv-ind on" id="ind-ema200" onclick="lvInd('ema200',this)">EMA 200</button>
-        <button class="lv-ind on" id="ind-tl"     onclick="lvInd('tl',this)"  title="Trendlinien">Trendl.</button>
-        <button class="lv-ind on" id="ind-sig"    onclick="lvInd('sig',this)" title="Bot-Signale">Sig.</button>
+        <!-- Layer/Indikatoren in aufklappbarem, gruppiertem Panel statt überladener Button-Reihe -->
+        <div class="lv-dropdown">
+          <button class="lv-ind" id="lv-layers-btn" onclick="lvLayersToggle(this)" title="Indikatoren &amp; Chart-Layer">☰ Layer</button>
+          <div class="lv-layers-panel" id="lv-layers-panel">
+            <div class="lv-lp-group">
+              <span class="lv-lp-title">Linien</span>
+              <button class="lv-ind on" id="ind-ema21"  onclick="lvInd('ema21',this)">EMA 21</button>
+              <button class="lv-ind"    id="ind-ema55"  onclick="lvInd('ema55',this)">EMA 55</button>
+              <button class="lv-ind on" id="ind-ema200" onclick="lvInd('ema200',this)">EMA 200</button>
+              <button class="lv-ind on" id="ind-tl"     onclick="lvInd('tl',this)">Trendlinien</button>
+            </div>
+            <div class="lv-lp-group">
+              <span class="lv-lp-title">Signale &amp; Zonen</span>
+              <button class="lv-ind on" id="ind-sig" onclick="lvInd('sig',this)">Signale</button>
+              <button class="lv-ind"    id="fvg-tgl" onclick="lvToggleFvg(this)" title="Fair Value Gaps &amp; Order Blocks">FVG / OB</button>
+              <button class="lv-ind"    id="poi-tgl" onclick="lvTogglePOI(this)" title="Gelernte POI-Zonen (mit Wahrscheinlichkeit)">POI</button>
+              <button class="lv-ind"    id="pat-tgl" onclick="lvToggleFeature('patterns',this)" title="Kerzen-Muster (Doji, Hammer, Engulfing)">Muster</button>
+            </div>
+            <div class="lv-lp-group">
+              <span class="lv-lp-title">Panels &amp; Sessions</span>
+              <button class="lv-ind on" id="macd-tgl" onclick="lvToggleFeature('macd',this)" title="MACD-Panel">MACD</button>
+              <button class="lv-ind"    id="sess-tgl" onclick="lvToggleFeature('sessions',this)" title="London / NY Session-Highlights">Sessions</button>
+            </div>
+          </div>
+        </div>
         <div class="lv-sep"></div>
-        <!-- Overlay-Toggles (kompakte Button-Form) -->
+        <!-- Modi/Aktionen bleiben sichtbar -->
         <button class="lv-ind"    id="lv-autoTgl"  onclick="lvToggleAuto()"                   title="Auto KI: analysiert jede neue Kerze automatisch">Auto KI</button>
         <button class="lv-ind on" id="bot-sig-tgl" onclick="lvToggleBotSigs(this)" title="Bot-Signale im Chart anzeigen" style="display:inline-flex;align-items:center;gap:4px;"><span class="dot di" id="bot-sig-dot"></span>◆ Bot</button>
-        <button class="lv-ind"    id="fvg-tgl"     onclick="lvToggleFvg(this)"                title="Fair Value Gaps &amp; Order Blocks">FVG</button>
-        <button class="lv-ind"    id="poi-tgl"     onclick="lvTogglePOI(this)"                title="Gelernte POI-Zonen (mit Wahrscheinlichkeit)">POI</button>
-        <button class="lv-ind on" id="macd-tgl"    onclick="lvToggleFeature('macd',this)"     title="MACD-Panel">MACD</button>
-        <button class="lv-ind"    id="sess-tgl"    onclick="lvToggleFeature('sessions',this)" title="London / NY Session-Highlights">Sess</button>
-        <button class="lv-ind"    id="pat-tgl"     onclick="lvToggleFeature('patterns',this)" title="Kerzen-Muster (Doji, Hammer, Engulfing)">Muster</button>
-        <div class="lv-sep"></div>
-        <!-- Paper Trader -->
         <button class="lv-ind on" id="pt-tgl" onclick="ptToggleBtn()" title="Paper Trading Ein/Aus" style="display:inline-flex;align-items:center;gap:4px;">
           <span class="dot dok" id="pt-dot"></span><span id="pt-tgl-lbl">Paper</span>
         </button>
@@ -6925,6 +6955,33 @@ function lvLegendToggle() {
   const tip = document.getElementById('lv-tip');
   if (tip && !isOpen) tip.style.display = 'none';
 }
+
+// Layer-Dropdown auf/zu (gruppierte Indikatoren statt überladener Toolbar)
+function lvLayersToggle(btn) {
+  const panel = document.getElementById('lv-layers-panel');
+  if (!panel) return;
+  const open = panel.classList.toggle('open');
+  if (btn) btn.classList.toggle('on', open);
+  if (open && btn) {
+    // Position unter dem Button, im Viewport gehalten (panel ist position:fixed)
+    const r = btn.getBoundingClientRect();
+    panel.style.top = (r.bottom + 7) + 'px';
+    const w = panel.offsetWidth || 236;
+    let left = Math.min(r.left, window.innerWidth - w - 8);
+    panel.style.left = Math.max(8, left) + 'px';
+  }
+}
+// Klick außerhalb schließt das Layer-Panel
+document.addEventListener('click', e => {
+  const dd = e.target.closest && e.target.closest('.lv-dropdown');
+  if (dd) return;
+  const panel = document.getElementById('lv-layers-panel');
+  const btn   = document.getElementById('lv-layers-btn');
+  if (panel && panel.classList.contains('open')) {
+    panel.classList.remove('open');
+    if (btn) btn.classList.remove('on');
+  }
+});
 
 // ── Legenden-Tooltips: erklärt jedes Symbol beim Drüberfahren ────────────────
 // Erklärungen werden per Texterkennung gesetzt (kein fehleranfälliges HTML-Editieren).
