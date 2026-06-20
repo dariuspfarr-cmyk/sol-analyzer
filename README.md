@@ -175,3 +175,5 @@ algo_signal_engine wird klüger
 - Ab **200 Signalen** trainiert sich ein lokales XGBoost-Modell und ersetzt Haiku (ab 60 % Genauigkeit).
 - Je mehr Live-Daten, desto höher das Live-Gewicht (70 % → 90 %).
 - Der **Algo-Only-Modus funktioniert auch ohne KI** — rein algorithmisch, $0.
+
+<!-- Auto-Sync Test -->
