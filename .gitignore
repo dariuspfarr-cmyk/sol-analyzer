@@ -26,3 +26,15 @@ __pycache__/
 
 # Charts/Output
 *.png
+
+# npm
+node_modules/
+
+# Logs und generierte Daten
+*.log
+*.jsonl
+poi_log.json
+research_cache.json
+state.json
+trades.csv
+trades.json
