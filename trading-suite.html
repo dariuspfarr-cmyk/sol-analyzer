@@ -365,34 +365,62 @@ canvas{display:block;width:100%;}
 
 /* ══ MOBILE / TOUCH-OPTIMIERUNG ═══════════════════════════════ */
 @media(max-width:768px){
-  /* Live-Bereich scrollbar: Chart oben, Seitenpanel (Signale/Paper/Log) darunter
-     statt es zu verstecken. main{overflow:auto} übernimmt das Scrollen. */
+  /* ─ Haupt-Navigation als feste Bottom-Tab-Bar: mobil-nativ, mit dem Daumen
+       erreichbar, immer sichtbar. Jede Sektion ein Tipp entfernt. ─ */
+  .mnav{
+    position:fixed; left:0; right:0; bottom:0; z-index:600; margin:0;
+    display:flex; gap:0; background:#0a0a0f;
+    border-top:1px solid var(--b); box-shadow:0 -3px 14px rgba(0,0,0,.5);
+    padding-bottom:env(safe-area-inset-bottom,0);
+  }
+  .mnav button{
+    flex:1; padding:11px 2px 10px; font-size:9px; letter-spacing:.3px;
+    text-align:center; white-space:nowrap;
+    border-bottom:none; border-top:2px solid transparent;
+  }
+  .mnav button.on{ color:#fff; border-top-color:#fff; border-bottom:none;
+    background:rgba(255,255,255,.05); }
+  header{ padding:0 14px; }
+  /* Inhalt frei von der Bottom-Bar halten (inkl. iPhone Safe-Area) */
+  main{ padding-bottom:calc(56px + env(safe-area-inset-bottom,0)); }
+
+  /* ─ Sub-Navigation + Statuszeile: gut tippbar, weich scrollen ─ */
+  .snav{ -webkit-overflow-scrolling:touch; }
+  .snav button{ padding:0 16px; font-size:12px; }
+  .sbar{ padding:5px 14px; }
+
+  /* ─ Live-Chart: Chart oben, Panel darunter gestapelt, voll touch-fähig ─ */
   #sec-live{ height:auto; overflow:visible; }
   .lv-layout{ display:flex; flex-direction:column; }
   .lv-chart-col{ border-right:none; }
-  .lv-canvas-wrap{ height:60vh; min-height:320px; flex:none; }
-  /* Seitenpanel NICHT verstecken (überschreibt die 1100px-Regel), sondern stapeln */
+  .lv-canvas-wrap{ height:58vh; min-height:320px; flex:none; }
   .lv-side{ display:flex !important; width:auto; border-top:1px solid #1a1a22; }
-  .lv-pane.on{ max-height:75vh; }
-  /* Touch-freundliche Toolbar: höhere Tap-Targets, weiches Scrollen */
+  .lv-pane.on{ max-height:78vh; }
+  .lv-tab{ padding:11px 4px; font-size:12px; }      /* größere Panel-Tabs */
+
+  /* ─ Touch-freundliche Chart-Toolbar ─ */
   .lv-toolbar{ height:auto; min-height:46px; padding:6px 10px; gap:6px;
                -webkit-overflow-scrolling:touch; }
   .lv-ind{ padding:7px 11px; font-size:11px; }
-  .lv-ibtn{ padding:7px 10px; font-size:12px; }
+  .lv-ibtn{ padding:7px 11px; font-size:12px; }
+  .lv-zoom{ padding:7px 11px; }
   .lv-legend-btn{ padding:6px 10px; }
   .lv-legend-grid{ grid-template-columns:1fr; }
-  /* Kopf/Navigation kompakter + horizontal scrollbar bei Überlauf */
-  header{ padding:0 12px; gap:8px; overflow-x:auto; }
-  .mnav button{ padding:13px 9px; }
-  .snav{ -webkit-overflow-scrolling:touch; }
-  .pg{ padding:12px 14px; }
+
+  /* ─ Inhalts-Seiten: großzügig, enge Grids brechen auf 2 Spalten ─ */
+  .pg{ padding:14px 14px; }
+  .g3,.g4,.g7{ grid-template-columns:1fr 1fr; }
+  .card{ padding:14px; }
 }
 @media(max-width:480px){
-  .lv-canvas-wrap{ height:54vh; min-height:280px; }
+  .lv-canvas-wrap{ height:52vh; min-height:280px; }
   .lv-pair{ font-size:13px; }
   .lv-price-disp{ font-size:14px; }
-  .pg{ padding:10px 11px; }
-  .logo{ letter-spacing:2px; }
+  .logo{ letter-spacing:2px; font-size:13px; }
+  .pg{ padding:11px 11px; }
+  /* Maximal übersichtlich: alles einspaltig untereinander */
+  .g2,.g3,.g4,.g7{ grid-template-columns:1fr; }
+  .mnav button{ font-size:8.5px; }
 }
 </style>
 </head>
