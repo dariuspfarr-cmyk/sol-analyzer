@@ -412,13 +412,19 @@ canvas{display:block;width:100%;}
   .snav button{ padding:0 16px; font-size:12px; }
   .sbar{ padding:5px 14px; }
 
-  /* ─ Live-Chart: Chart oben, Panel darunter gestapelt, voll touch-fähig ─ */
+  /* ─ Live-Chart: EIN einziger Scroll-Container (main). Chart oben, Panel
+       darunter — alles fließt, keine verschachtelten Scrollbereiche (das war
+       die Quelle des „Wackelns"). ─ */
   #sec-live{ height:auto; overflow:visible; }
   .lv-layout{ display:flex; flex-direction:column; }
   .lv-chart-col{ border-right:none; }
-  .lv-canvas-wrap{ height:58vh; min-height:320px; flex:none; }
-  .lv-side{ display:flex !important; width:auto; border-top:1px solid #1a1a22; }
-  .lv-pane.on{ max-height:78vh; }
+  /* touch-action:pan-y → vertikale Wischgeste scrollt die Seite nativ,
+     horizontale pant den Chart (Richtungs-Lock im JS). */
+  .lv-canvas-wrap{ height:56vh; min-height:300px; flex:none; touch-action:pan-y; }
+  .lv-side{ display:flex !important; width:auto; overflow:visible;
+            border-top:1px solid #1a1a22; }
+  .lv-pane{ overflow:visible; }
+  .lv-pane.on{ flex:none; max-height:none; overflow:visible; }
   .lv-tab{ padding:11px 4px; font-size:12px; }      /* größere Panel-Tabs */
 
   /* ─ Touch-freundliche Chart-Toolbar ─ */
@@ -4858,7 +4864,10 @@ class LiveChart {
 
     el.addEventListener('dblclick', () => { this.candleW = 9; this.offsetRight = 8; this.render(); });
 
-    // ── Touch (Mobile): 1 Finger = Pan + Crosshair, 2 Finger = Pinch-Zoom ──
+    // ── Touch (Mobile) mit RICHTUNGS-LOCK ────────────────────────
+    // Vertikal wischen → Seite scrollt NATIV (Chart frisst die Geste nicht mehr,
+    // das war die Haupt-Ursache der Scroll-Probleme). Horizontal → Chart pannen.
+    // 2 Finger → Pinch-Zoom. Zusammen mit touch-action:pan-y (Mobile-CSS).
     let _tPan = null, _tPinch = null;
     const _pinchInfo = t => {
       const r = el.getBoundingClientRect();
@@ -4866,27 +4875,30 @@ class LiveChart {
                d:Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY) };
     };
     el.addEventListener('touchstart', e => {
-      const r = el.getBoundingClientRect();
       if (e.touches.length === 1) {
-        _tPan = { x:e.touches[0].clientX, off:this.offsetRight };
+        _tPan = { x:e.touches[0].clientX, y:e.touches[0].clientY, off:this.offsetRight, dir:null };
         _tPinch = null;
-        this.mX = e.touches[0].clientX - r.left;
-        this.mY = e.touches[0].clientY - r.top;
-        this.render();
       } else if (e.touches.length === 2) {
         _tPinch = { ..._pinchInfo(e.touches), cw:this.candleW };
-        _tPan = null; this.mX = null;
+        _tPan = null; this.mX = null; this.render();
       }
     }, {passive:true});
     el.addEventListener('touchmove', e => {
       if (e.touches.length === 1 && _tPan) {
-        e.preventDefault();
-        const r  = el.getBoundingClientRect();
-        const dx = e.touches[0].clientX - _tPan.x;
-        const n  = this.candles.length;
+        const t  = e.touches[0];
+        const dx = t.clientX - _tPan.x, dy = t.clientY - _tPan.y;
+        // Richtung beim ersten signifikanten Move festlegen
+        if (_tPan.dir === null) {
+          if (Math.abs(dx) < 8 && Math.abs(dy) < 8) return;
+          _tPan.dir = Math.abs(dx) > Math.abs(dy) ? 'h' : 'v';
+          if (_tPan.dir === 'v') { _tPan = null; return; }  // vertikal → Seite scrollt
+        }
+        e.preventDefault();   // horizontal → Chart pannen
+        const r = el.getBoundingClientRect();
+        const n = this.candles.length;
         this.offsetRight = Math.max(-50, Math.min(n - 5, _tPan.off + dx / this.candleW));
-        this.mX = e.touches[0].clientX - r.left;
-        this.mY = e.touches[0].clientY - r.top;
+        this.mX = t.clientX - r.left;
+        this.mY = t.clientY - r.top;
         this.render();
       } else if (e.touches.length === 2 && _tPinch) {
         e.preventDefault();
@@ -4895,7 +4907,6 @@ class LiveChart {
         const oldCW = this.candleW;
         const oldStartI = this.startI;
         this.candleW = Math.max(3, Math.min(40, _tPinch.cw * ratio));
-        // Anker: Kerze unter dem Pinch-Mittelpunkt behält ihre Position
         if (this.candles.length) {
           const anchorCandle = oldStartI + _tPinch.x / oldCW;
           const newVisN      = Math.floor(this.CW / this.candleW);
@@ -4910,7 +4921,7 @@ class LiveChart {
       if (e.touches.length === 0) { _tPan = null; _tPinch = null; this.mX = null; this.render(); }
       else if (e.touches.length === 1) {
         _tPinch = null;
-        _tPan = { x:e.touches[0].clientX, off:this.offsetRight };
+        _tPan = { x:e.touches[0].clientX, y:e.touches[0].clientY, off:this.offsetRight, dir:null };
       }
     };
     el.addEventListener('touchend', _touchEnd);
@@ -6832,6 +6843,19 @@ function lvInit() {
   if (lvChart) { setTimeout(()=>lvChart._resize(),50); return; }
   if (!document.getElementById('lv-canvas')) return; // section not yet in DOM
   lvChart = new LiveChart('lv-canvas','lv-wrap');
+
+  // Animations-Loop während des Seiten-Scrollens pausieren → flüssiges,
+  // ruckelfreies Scrollen (der Canvas rendert sonst 60fps gegen den Scroll).
+  const _main = document.querySelector('main');
+  if (_main && !_main._lvScrollHook) {
+    _main._lvScrollHook = true;
+    let _scrollT;
+    _main.addEventListener('scroll', () => {
+      if (lvChart) lvChart.setVisible(false);
+      clearTimeout(_scrollT);
+      _scrollT = setTimeout(() => { if (lvChart) lvChart.setVisible(true); }, 180);
+    }, {passive:true});
+  }
   lvAE    = new AutoSignalEngine(lvChart);
   lvDM    = new LiveDataManager(lvChart);
   lvDM.onTick   = price  => { if (lvAE) lvAE._pruneStaleSignals(); };
