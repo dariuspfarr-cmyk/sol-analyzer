@@ -97,7 +97,19 @@ DD_SCALE_MAX_PCT      = 10.0 # bei 10% Drawdown → 50% der normalen Risikogrö�
 DAILY_PERF_FILE        = BASE / "daily_performance.json"
 STRATEGY_RULES_FILE    = BASE / "strategy_rules.json"
 ACTIVE_STRATEGY_FILE   = BASE / "active_strategy.json"
-MAX_POSITIONS          = 3      # max. gleichzeitig offene Positionen
+MAX_POSITIONS          = 3      # max. gleichzeitig offene Positionen (Selektiv-Modus)
+
+# ── LERN-MODUS: jedes Signal realistisch paper-traden ────────────────────────
+# Statt nur das beste Signal selektiv zu traden, wird JEDES valide Signal (pro
+# Timeframe/Chart) realistisch paper-getradet (echter Fill: Slippage, Gebühren,
+# SL/TP intrabar, Lot/Tick-Rundung). So lernen die Bots aus realen Ausführungs-
+# Ergebnissen für jeden Setup-Typ und jeden Chart — nicht nur aus SL/TP-Simulation.
+# Der realistische Entry-Trigger bleibt aktiv (nur eröffnen, wenn der Preis das
+# Signal JETZT signalisiert — kein rückwirkendes Traden).
+TRADE_EVERY_SIGNAL   = True     # True: jedes valide Signal wird paper-getradet
+LEARN_TRADE_NOTIONAL = 100.0    # fixe $-Positionsgröße je Lern-Trade (entkoppelt vom
+                                # geteilten Kapital, damit es nicht nach 3 Trades blockt)
+MAX_POSITIONS_LEARN  = 120      # viele parallele Lern-Positionen erlauben
 
 
 def _dynamic_score_floor(state: "State") -> float:
@@ -1118,11 +1130,16 @@ def _score_signal(row: dict, market_bias: str, hourly_perf: dict,
     return composite
 
 
-def _get_db_signal(state: Optional["State"] = None) -> Optional[dict]:
+def _get_db_signal(state: Optional["State"] = None, return_all: bool = False):
     """
-    Holt das beste handelbare Signal aus signals.db.
-    Wählt nicht einfach das erste, sondern das Signal mit dem höchsten
-    Composite-Score (Konfidenz + Backtest + Markt-Bias + Stunde + Lerngewichte).
+    Holt handelbare Signale aus signals.db.
+
+    return_all=False (Selektiv-Modus): gibt das EINE beste Signal nach Composite-
+    Score zurück (oder None).
+    return_all=True (Lern-Modus, TRADE_EVERY_SIGNAL): gibt ALLE validen Signale als
+    Liste zurück, deren Entry GERADE realistisch triggert — die Selektivitäts-
+    Filter (Confluence, ALGO-Ausschluss, Regime, Score-Floor, Cooldown/Dedup)
+    werden übersprungen, der realistische Entry-Trigger bleibt aktiv.
     """
     candidates = signal_logger.get_tradeable_signals(max_age_hours=MAX_SIGNAL_AGE_H)
     if not candidates:
@@ -1223,24 +1240,25 @@ def _get_db_signal(state: Optional["State"] = None) -> Optional[dict]:
         if sl_dist < 1e-6:
             continue
         rr = abs(tp - entry) / sl_dist
-        if rr < dynamic_rr:
-            continue
+        if rr < (1.0 if return_all else dynamic_rr):
+            continue   # Lern-Modus: nur grob-invalide R:R (<1) ablehnen
 
         # Setup-Cooldown-Filter: überspringe Setups mit zu vielen kürzlichen Verlusten
         setup_type = row.get("setup_type", "Unknown")
-        if setup_type in active_cooldowns:
+        if setup_type in active_cooldowns and not return_all:
             continue
 
         # Dedup-Filter: kein erneuter Eintritt in gleiches Setup+Richtung innerhalb DEDUP_HOURS
         bias      = row.get("bias", "neutral")
         direction = "long" if bias == "bullish" else "short"
-        if (setup_type, direction) in recently_traded:
+        if (setup_type, direction) in recently_traded and not return_all:
             continue
 
-        # Offene-Positionen-Filter: keine Duplikate laufender Positionen
+        # Offene-Positionen-Filter: dasselbe Signal nie doppelt öffnen (immer aktiv).
+        # Gleiche Setup+Richtung-Kombi nur im Selektiv-Modus sperren.
         if row.get("id") in open_sig_ids:
             continue
-        if (setup_type, direction) in open_combos:
+        if (setup_type, direction) in open_combos and not return_all:
             continue
 
         # ── Entry-Trigger: Preis muss JETZT in der Entry-Zone liegen ──────────
@@ -1263,19 +1281,21 @@ def _get_db_signal(state: Optional["State"] = None) -> Optional[dict]:
 
         # Contra-HTF Hard-Gate: ≤−2 Alignment = starker HTF-Gegenwind → überspringen
         mtf_a = row.get("mtf_alignment")
-        if mtf_a is not None and int(float(mtf_a)) <= -2:
+        if mtf_a is not None and int(float(mtf_a)) <= -2 and not return_all:
             continue
 
         # Zone-Gate: nacktes Premium/Discount-Zonen-Setup verliert historisch
         # (~16% WR). Nur traden, wenn die höheren Timeframes die Reversal-Richtung
         # bestätigen (Alignment ≥ +1) — sonst überspringen.
-        if setup_type == "Zone":
+        if setup_type == "Zone" and not return_all:
             if mtf_a is None or int(float(mtf_a)) < 1:
                 continue
 
         # Regime-Gate: Reversal-Setup (EQH/EQL/Zone) GEGEN einen starken Trend
         # = historisch ~0% WR (jüngste Trendphase). Überspringen.
-        if _setup_category(setup_type) == "reversal" and _market_regime() == "strong_trend":
+        if (not return_all
+                and _setup_category(setup_type) == "reversal"
+                and _market_regime() == "strong_trend"):
             _dt = _get_daily_trend()
             _dir = "long" if bias == "bullish" else "short"
             _counter = (_dt == "bullish" and _dir == "short") or \
@@ -1284,50 +1304,59 @@ def _get_db_signal(state: Optional["State"] = None) -> Optional[dict]:
                 continue
 
         # Bull Run Short-Gate: kein Short in early_bull / mid_bull
-        try:
-            import bull_run_detector as _brd
-            if not _brd.get_playbook().get("allow_shorts", True):
-                if row.get("bias") == "bearish":
-                    continue
-        except Exception:
-            pass
+        if not return_all:
+            try:
+                import bull_run_detector as _brd
+                if not _brd.get_playbook().get("allow_shorts", True):
+                    if row.get("bias") == "bearish":
+                        continue
+            except Exception:
+                pass
 
         # Confluence-Gate (Backtest-validiert): ≥2 bestätigende Trigger.
         # Einzel-Trigger-Signale sind schwach — dieser Filter hob die Out-of-
-        # Sample-WR von 43% auf 62%.
+        # Sample-WR von 43% auf 62%. (Im Lern-Modus übersprungen.)
         try:
             _ntrig = len(json.loads(row.get("all_triggers") or "[]"))
         except Exception:
             _ntrig = 1
-        if _ntrig < MIN_TRIGGERS_CONFLUENCE:
+        if _ntrig < MIN_TRIGGERS_CONFLUENCE and not return_all:
             continue
 
-        # Mindest-Konfidenz + Quellen-Filter
-        if src == "LIVE":
-            if (row.get("confidence_score") or 0.0) < MIN_CONFIDENCE_SCORE:
+        # Mindest-Konfidenz + Quellen-Filter (im Lern-Modus: alle Quellen zulassen)
+        if not return_all:
+            if src == "LIVE":
+                if (row.get("confidence_score") or 0.0) < MIN_CONFIDENCE_SCORE:
+                    continue
+            elif src == "ALGO":
+                if not PAPER_TRADE_ALGO:
+                    continue
+                if (row.get("algo_score") or 0.0) < ALGO_MIN_SCORE:
+                    continue
+                if row.get("routing") == "algo_log":
+                    continue
+            else:
                 continue
-        elif src == "ALGO":
-            if not PAPER_TRADE_ALGO:
-                continue   # Backtest: ALGO-Signale senken die WR → nur LIVE paper-traden
-            if (row.get("algo_score") or 0.0) < ALGO_MIN_SCORE:
-                continue
-            if row.get("routing") == "algo_log":
-                continue
-        else:
+        elif src not in ("LIVE", "ALGO", "BACKTEST"):
             continue
 
         score = _score_signal(row, market_bias, hourly_perf, weights, sig_map)
         floor = _dynamic_score_floor(state) if state else MIN_SCORE_FLOOR
-        if score < floor:
+        if score < floor and not return_all:
             continue   # Adaptiver Floor: schlechtere Signale bei schlechter Performance ignorieren
         row["_composite_score"] = round(score, 2)
+        row["_live_price"]      = current_price
         scored.append((score, row))
 
     if not scored:
-        return None
+        return [] if return_all else None
 
-    # Bestes Signal zurückgeben — Live-Preis als realistischen Fill mitgeben
     scored.sort(key=lambda x: x[0], reverse=True)
+    # Lern-Modus: ALLE valide getriggerten Signale zurückgeben (jedes wird getradet)
+    if return_all:
+        return [r for _, r in scored]
+
+    # Selektiv-Modus: bestes Signal — Live-Preis als realistischen Fill mitgeben
     best_score, best_row = scored[0]
     best_row["_live_price"] = current_price
     if len(scored) > 1:
@@ -1340,7 +1369,8 @@ def _get_db_signal(state: Optional["State"] = None) -> Optional[dict]:
 # ── Trade-Ausführung ──────────────────────────────────────────────────────────
 def _open_trade_from_signal(state: State, sig_row: dict) -> None:
     """Öffnet einen Paper-Trade auf Basis einer Signal-Row aus signals.db."""
-    if len(state.positions) >= MAX_POSITIONS:
+    _pos_cap = MAX_POSITIONS_LEARN if TRADE_EVERY_SIGNAL else MAX_POSITIONS
+    if len(state.positions) >= _pos_cap:
         return
 
     # News-Block: kein neuer Trade innerhalb ±2h eines High-Impact Events
@@ -1465,26 +1495,34 @@ def _open_trade_from_signal(state: State, sig_row: dict) -> None:
         risk_mult *= _br_short_mult
     risk_mult = max(MIN_RISK_MULT, min(MAX_RISK_MULT, risk_mult))
 
-    risk_usd = state.balance * RISK_PCT * risk_mult
-    size     = risk_usd / sl_dist
-    notional = size * entry
-
-    # ── Kapitalgrenze: nicht mehr Kapital einsetzen als frei verfügbar ──────────
-    # (MAX_LEVERAGE = 1.0 → Spot: man kann nur so viel SOL kaufen wie Cash da ist).
-    open_notional = sum(pp.get("notional", pp["entry"] * pp["size"])
-                        for pp in state.positions)
-    free_capital  = max(0.0, state.balance * MAX_LEVERAGE - open_notional)
-    if free_capital < 10.0:
-        print(f"  [Kapital] Nur ${free_capital:.2f} frei (Rest in offenen Positionen) "
-              f"— Trade übersprungen")
-        return
-    if notional > free_capital:
-        # Position auf das verfügbare Kapital begrenzen → reales Risiko sinkt mit
-        size     = free_capital / entry
-        notional = size * entry
+    if TRADE_EVERY_SIGNAL:
+        # Lern-Modus: FIXE Positionsgröße je Trade, entkoppelt vom geteilten Kapital
+        # → jedes Signal kann realistisch getradet werden, ohne dass nach wenigen
+        # Trades das Kapital blockt. Slippage/Gebühren/SL-TP-Realismus bleiben.
+        notional = LEARN_TRADE_NOTIONAL
+        size     = notional / entry
         risk_usd = size * sl_dist
-        print(f"  [Kapital] Position auf freies Kapital begrenzt: "
-              f"${notional:,.2f} (statt voller Risikogröße)")
+    else:
+        risk_usd = state.balance * RISK_PCT * risk_mult
+        size     = risk_usd / sl_dist
+        notional = size * entry
+
+        # ── Kapitalgrenze: nicht mehr Kapital einsetzen als frei verfügbar ──────
+        # (MAX_LEVERAGE = 1.0 → Spot: man kann nur so viel SOL kaufen wie Cash da ist).
+        open_notional = sum(pp.get("notional", pp["entry"] * pp["size"])
+                            for pp in state.positions)
+        free_capital  = max(0.0, state.balance * MAX_LEVERAGE - open_notional)
+        if free_capital < 10.0:
+            print(f"  [Kapital] Nur ${free_capital:.2f} frei (Rest in offenen Positionen) "
+                  f"— Trade übersprungen")
+            return
+        if notional > free_capital:
+            # Position auf das verfügbare Kapital begrenzen → reales Risiko sinkt mit
+            size     = free_capital / entry
+            notional = size * entry
+            risk_usd = size * sl_dist
+            print(f"  [Kapital] Position auf freies Kapital begrenzt: "
+                  f"${notional:,.2f} (statt voller Risikogröße)")
 
     # Lot-Size: Stückzahl auf Börsen-Schrittweite ABrunden (man bekommt nie mehr
     # als die nächste handelbare Einheit) und Kennzahlen konsistent neu berechnen.
@@ -2070,7 +2108,25 @@ def run_once(state: State) -> None:
     # Offenen Trade prüfen
     _check_close(state, df)
 
-    if len(state.positions) < MAX_POSITIONS:
+    _pos_cap = MAX_POSITIONS_LEARN if TRADE_EVERY_SIGNAL else MAX_POSITIONS
+    if TRADE_EVERY_SIGNAL:
+        # ── LERN-MODUS: jedes valide, gerade getriggerte Signal realistisch traden.
+        # Kein Circuit-Breaker / keine Selektion — Ziel ist, für JEDES Signal pro
+        # Timeframe ein reales Ausführungs-Ergebnis zu erzeugen, aus dem die Bots
+        # lernen. Der Entry-Trigger (Realismus) steckt in _get_db_signal/_open_trade.
+        if len(state.positions) < _pos_cap:
+            opened = 0
+            for sig_row in (_get_db_signal(state, return_all=True) or []):
+                if len(state.positions) >= _pos_cap:
+                    break
+                before = len(state.positions)
+                _open_trade_from_signal(state, sig_row)
+                if len(state.positions) > before:
+                    opened += 1
+            if opened:
+                print(f"  🎓 [Lern-Modus] {opened} neue(s) Signal(e) realistisch "
+                      f"paper-getradet (jedes Signal pro Chart)")
+    elif len(state.positions) < MAX_POSITIONS:
         today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
         # Circuit-Breaker 1: Pause nach Verlustserie (N Verluste in Folge)
         paused = False
