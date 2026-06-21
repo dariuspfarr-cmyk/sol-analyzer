@@ -27,6 +27,8 @@ PARAMS_FILE  = Path(__file__).parent / "strategy_params.json"
 MIN_SAMPLES  = 15         # min. geschlossene Auto-KI-Trades je Richtung
 SINGLE_DIR_MIN = 30       # ab so vielen Trades EINER Richtung darf sie allein
                           # (bei klar negativer Bilanz) abgeschaltet werden
+BLOCK_MIN    = 20         # min. Trades, um ein Setup/TF als toxisch zu blocken
+BLOCK_WR     = 30.0       # WR-Schwelle: darunter (+ negativ) = toxisch → blocken
 MIN_BUCKET_N = 3          # min. Trades je 5er-RSI-Bucket, um ihm zu trauen
 MIN_ZONE_W   = 15         # RSI-Zone nie schmaler als das (sonst keine Signale)
 MAX_STEP     = 12         # max. Verschiebung je Grenze pro Lauf → graduell, kein Overfit-Sprung
@@ -37,23 +39,43 @@ _DEFAULTS = {"lRsiMin": 28, "lRsiMax": 52, "sRsiMin": 52, "sRsiMax": 72,
              "rrRatio": 2, "slPct": 6, "pivotLB": 5, "dirMode": "both"}
 
 
+# Auto-KI-Setup (DB) → signalType der Browser-Engine
+_SETUP_TO_SIGTYPE = {"Zone": "bounce", "BOS": "breakout", "CHoCH": "reversal"}
+
+
 def _load_autoki_closed() -> list[dict]:
     c = sqlite3.connect(DB); c.row_factory = sqlite3.Row
     rows = [dict(r) for r in c.execute(
-        "SELECT trigger_reason, bias, outcome, pnl_pct FROM signals "
-        "WHERE routing='autoki' AND outcome IN ('WIN','LOSS')").fetchall()]
+        "SELECT trigger_reason, bias, outcome, pnl_pct, setup_type, timeframe "
+        "FROM signals WHERE routing='autoki' AND outcome IN ('WIN','LOSS')").fetchall()]
     out = []
     for r in rows:
         m = _RSI_RE.search(r.get("trigger_reason") or "")
-        if not m:
-            continue
+        rsi = float(m.group(1)) if m else None
         out.append({
-            "rsi": float(m.group(1)),
+            "rsi": rsi,
             "dir": "long" if r.get("bias") == "bullish" else "short",
             "win": r.get("outcome") == "WIN",
             "pnl": float(r.get("pnl_pct") or 0.0),
+            "setup": r.get("setup_type") or "?",
+            "tf":    r.get("timeframe") or "?",
         })
     return out
+
+
+def _block_by(samples: list[dict], key: str):
+    """Findet toxische Ausprägungen (≥ BLOCK_MIN Trades, WR < BLOCK_WR, Ø-PnL < 0)."""
+    from collections import defaultdict
+    agg: dict = defaultdict(lambda: {"n": 0, "w": 0, "pnl": 0.0})
+    for s in samples:
+        d = agg[s[key]]
+        d["n"] += 1; d["w"] += 1 if s["win"] else 0; d["pnl"] += s["pnl"]
+    blocked = []
+    for k, d in agg.items():
+        if (d["n"] >= BLOCK_MIN and d["w"] / d["n"] * 100 < BLOCK_WR
+                and d["pnl"] / d["n"] < 0):
+            blocked.append((k, d["n"], round(d["w"] / d["n"] * 100, 1)))
+    return blocked
 
 
 def _clamp_step(cur: float, target: float) -> float:
@@ -100,8 +122,9 @@ def _best_rsi_zone(samples: list[dict], lo_cur: float, hi_cur: float):
 def optimize() -> dict:
     """Lernt die Signal-Parameter aus den realistischen Auto-KI-Outcomes."""
     samples = _load_autoki_closed()
-    longs   = [s for s in samples if s["dir"] == "long"]
-    shorts  = [s for s in samples if s["dir"] == "short"]
+    rsi_ok  = [s for s in samples if s["rsi"] is not None]
+    longs   = [s for s in rsi_ok if s["dir"] == "long"]
+    shorts  = [s for s in rsi_ok if s["dir"] == "short"]
 
     params: dict = {}
     if PARAMS_FILE.exists():
@@ -155,6 +178,21 @@ def optimize() -> dict:
             f"dirMode: {cur_dir} → {new_dir} "
             f"(Long {l_wr:.0f}%/{l_exp:+.1f}% · Short {s_wr:.0f}%/{s_exp:+.1f}%)")
         params["dirMode"] = new_dir
+
+    # ── Setup-Blocklist (Punkt 3) + Timeframe-Blocklist (Punkt 4) ─────────────
+    # Toxische Auto-KI-Setups/TFs (z. B. Zone/Bounce 3.7% WR, 4h 2.6% WR) ganz
+    # abschalten — die Browser-Engine erzeugt sie dann nicht mehr.
+    sig_blocks = sorted({_SETUP_TO_SIGTYPE.get(k, k.lower())
+                         for k, n, wr in _block_by(samples, "setup")})
+    tf_blocks  = sorted({k for k, n, wr in _block_by(samples, "tf")})
+    if sig_blocks != sorted(params.get("blockedSignalTypes", [])):
+        info = ", ".join(f"{k} {wr}%" for k, n, wr in _block_by(samples, "setup"))
+        changed.append(f"blockedSignalTypes → {sig_blocks} ({info})")
+        params["blockedSignalTypes"] = sig_blocks
+    if tf_blocks != sorted(params.get("blockedTFs", [])):
+        info = ", ".join(f"{k} {wr}%" for k, n, wr in _block_by(samples, "tf"))
+        changed.append(f"blockedTFs → {tf_blocks} ({info})")
+        params["blockedTFs"] = tf_blocks
 
     # Defaults sicherstellen (Browser lädt nur wenn p.lRsiMin existiert)
     for k, v in _DEFAULTS.items():
