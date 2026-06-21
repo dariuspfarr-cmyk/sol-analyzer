@@ -1249,6 +1249,17 @@ def _get_db_signal(state: Optional["State"] = None, return_all: bool = False):
         if rr < (1.0 if return_all else dynamic_rr):
             continue   # Lern-Modus: nur grob-invalide R:R (<1) ablehnen
 
+        # Handelbarkeit (gilt in BEIDEN Modi): struktureller Stop zu weit → der
+        # Preis erreicht SL/TP nie im Tracking-Fenster, die Position sitzt tagelang
+        # fest (z. B. 1d-EQH mit ~16-24% Stop). Untradeable ≠ lernbar → nicht öffnen.
+        try:
+            import tf_profiles
+            if entry > 0 and (sl_dist / entry) > tf_profiles.max_risk_pct(
+                    row.get("timeframe", "4h")):
+                continue
+        except Exception:
+            pass
+
         # Setup-Cooldown-Filter: überspringe Setups mit zu vielen kürzlichen Verlusten
         setup_type = row.get("setup_type", "Unknown")
         if setup_type in active_cooldowns and not return_all:
@@ -1959,6 +1970,26 @@ def _finalize_close(state: State, p: dict, exit_price: float, reason: str,
 
 def _check_close(state: State, df: pd.DataFrame) -> Optional[dict]:
     """Prüft alle offenen Positionen auf SL/TP — gibt letzten geschlossenen Trade zurück."""
+    # Aufräumen: nicht handelbare Altpositionen (struktureller Stop zu weit, z. B.
+    # alte 1d-Signale mit ~16-24% Stop) schließen — sie säßen sonst tagelang fest.
+    # Greift für Positionen, die VOR dem Handelbarkeits-Filter eröffnet wurden.
+    try:
+        import tf_profiles
+        cur_px = float(df["close"].iloc[-1]) if df is not None and len(df) else None
+        if cur_px:
+            for p in list(state.positions):
+                e  = float(p.get("entry", 0) or 0)
+                sl = float(p.get("sl", 0) or 0)
+                if e > 0 and abs(e - sl) / e > tf_profiles.max_risk_pct(
+                        p.get("timeframe", "4h")):
+                    print(f"  🧹 Aufräumen: nicht handelbare Position sig#"
+                          f"{p.get('signal_id')} ({p.get('timeframe')} "
+                          f"{p.get('setup_type')}, Stop {abs(e-sl)/e*100:.0f}%) "
+                          f"wird geschlossen.")
+                    _finalize_close(state, p, cur_px, "untradeable_cleanup", 0, 0.0, 0.0)
+    except Exception as ex:
+        _log_error(f"untradeable_cleanup: {ex}")
+
     last = None
     for p in list(state.positions):
         result = _check_close_one(state, p, df)
