@@ -853,6 +853,12 @@ canvas{display:block;width:100%;}
             </div>
           </div>
 
+          <!-- Performance JE TIMEFRAME (ein Konto, Statistik pro Chart) -->
+          <div>
+            <div style="font-size:9px;color:#444;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">Performance je Timeframe</div>
+            <div id="pt-tf-stats" style="font-size:11px;color:#444">—</div>
+          </div>
+
           <!-- Setup-Performance -->
           <div>
             <div style="font-size:9px;color:#444;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">Setup Win-Rate (letzte 100)</div>
@@ -5243,13 +5249,19 @@ class LiveChart {
         ctx.fill();
       });
 
-      // Label mit Berührungs-Anzahl + gelernter Win-Rate
-      const wrStr  = _tlWrLabel(tc);
-      const tcStr  = tc >= 3 ? ` ${tc}×${wrStr}` : wrStr;
-      const prefix = isAsc ? 'TL↑' : 'TL↓';
-      ctx.fillStyle = col + 'cc'; ctx.font = `${tc >= 3 ? 'bold ' : ''}9px Segoe UI`; ctx.textAlign = 'left';
-      const labelY  = this.toY(btTLProject(tl, endVis-1), y0, ph, lo, hi);
-      ctx.fillText(prefix + tcStr, x2 + 3, labelY + 3);
+      // Label mit Berührungs-Anzahl + gelernter Win-Rate.
+      // Auf schmalen Screens (Mobile) kompakt halten und schwache TLs nicht
+      // labeln — sonst überlappen sich die Labels nahe dem aktuellen Preis.
+      const narrow = (this.W || 800) < 560;
+      if (!(narrow && tc < 3)) {
+        const wrStr  = _tlWrLabel(tc);
+        const tcStr  = narrow ? (tc >= 3 ? ` ${tc}×` : '')
+                              : (tc >= 3 ? ` ${tc}×${wrStr}` : wrStr);
+        const prefix = isAsc ? 'TL↑' : 'TL↓';
+        ctx.fillStyle = col + 'cc'; ctx.font = `${tc >= 3 ? 'bold ' : ''}9px Segoe UI`; ctx.textAlign = 'left';
+        const labelY  = this.toY(btTLProject(tl, endVis-1), y0, ph, lo, hi);
+        ctx.fillText(prefix + tcStr, x2 + 3, labelY + 3);
+      }
     };
     if (this.activeTLs) {
       drawTL(this.activeTLs.asc,  this.C.tlUp);
@@ -8439,6 +8451,29 @@ function ptRender(d) {
     const ws = d.consecutive_wins || 0;
     wsEl.textContent = ws + (ws >= 3 ? ' 🔥' : '');
     wsEl.style.color = ws >= 3 ? '#089981' : ws >= 1 ? '#f59e0b' : '#555';
+  }
+
+  // Performance je Timeframe (ein Konto, getrennte Statistik pro Chart)
+  const tfs = d.timeframe_stats || {};
+  const tfEl = document.getElementById('pt-tf-stats');
+  if (tfEl) {
+    const order = {'15m':0,'1h':1,'4h':2,'1d':3};
+    const rows = Object.entries(tfs).sort((a,b) => (order[a[0]]??9) - (order[b[0]]??9));
+    if (!rows.length) {
+      tfEl.innerHTML = '<span style="color:#222">— noch keine Trades</span>';
+    } else {
+      const head = `<div style="display:flex;justify-content:space-between;padding:0 0 3px;color:#2a2a3a;font-size:9px;text-transform:uppercase;letter-spacing:.4px">`
+        + `<span>TF</span><span>WR</span><span>Trades</span><span>PnL</span><span>PF</span></div>`;
+      tfEl.innerHTML = head + rows.map(([tf, v]) =>
+        `<div style="display:flex;justify-content:space-between;padding:2px 0;border-bottom:1px solid #0d0d14">` +
+        `<span style="color:#9a9ab8;font-weight:600">${tf.toUpperCase()}</span>` +
+        `<span style="color:${v.wr>=50?'#089981':'#f23645'}">${v.wr}%</span>` +
+        `<span style="color:#333;font-family:'Courier New',monospace">${v.n}T</span>` +
+        `<span style="color:${v.pnl>=0?'#089981':'#f23645'};font-family:'Courier New',monospace">${v.pnl>=0?'+':''}${v.pnl.toFixed(1)}$</span>` +
+        `<span style="color:#555;font-family:'Courier New',monospace">${v.pf==null?'—':v.pf.toFixed(2)}</span>` +
+        `</div>`
+      ).join('');
+    }
   }
 
   // Setup-Performance Tabelle

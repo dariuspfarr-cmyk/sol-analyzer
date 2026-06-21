@@ -1847,6 +1847,7 @@ def _finalize_close(state: State, p: dict, exit_price: float, reason: str,
         "closed_at":     closed_at,
         "signal_id":     p.get("signal_id"),
         "setup_type":    p.get("setup_type", ""),
+        "timeframe":     p.get("timeframe", "4h"),   # für Statistik je Timeframe
         "mfe_pct":       round(mfe_pct, 3),
         "mae_pct":       round(mae_pct, 3),
         "candles_taken": candles_taken,
@@ -2280,6 +2281,41 @@ def _calc_setup_stats(trades: list) -> dict:
     }
 
 
+def _calc_timeframe_stats(trades: list) -> dict:
+    """
+    Getrennte Auswertung JE TIMEFRAME (ein Konto, Statistik pro Chart):
+    Win-Rate, Netto-PnL, Profit-Faktor und Trade-Zahl pro Timeframe.
+    So sieht man direkt, welcher Chart am besten performt — die Bots lernen
+    über die getaggten Outcomes ohnehin pro Timeframe.
+    """
+    from collections import defaultdict
+    agg: dict = defaultdict(lambda: {"n": 0, "wins": 0, "pnl": 0.0,
+                                     "gw": 0.0, "gl": 0.0})
+    for t in trades:
+        tf  = t.get("timeframe") or "?"
+        pnl = float(t.get("pnl", 0))
+        agg[tf]["n"]   += 1
+        agg[tf]["pnl"]  = round(agg[tf]["pnl"] + pnl, 4)
+        if pnl > 0:
+            agg[tf]["wins"] += 1
+            agg[tf]["gw"]   += pnl
+        else:
+            agg[tf]["gl"]   += -pnl
+    # Nach Timeframe-Reihenfolge sortiert ausgeben
+    order = {"15m": 0, "1h": 1, "4h": 2, "1d": 3}
+    out = {}
+    for tf in sorted(agg, key=lambda x: order.get(x, 9)):
+        d  = agg[tf]
+        pf = (d["gw"] / d["gl"]) if d["gl"] > 0 else None
+        out[tf] = {
+            "n":   d["n"],
+            "wr":  round(d["wins"] / d["n"] * 100, 1) if d["n"] else 0.0,
+            "pnl": round(d["pnl"], 2),
+            "pf":  round(pf, 2) if pf is not None else None,
+        }
+    return out
+
+
 def _get_status_pois(df=None) -> list:
     """Aktive POIs mit gelernten Erfolgsquoten, für das Dashboard."""
     try:
@@ -2394,6 +2430,7 @@ def get_status() -> dict:
         "poi_stats":          _get_poi_stats_summary(),
         "balance_history":    [t["balance_after"] for t in trades[-50:] if "balance_after" in t],
         "setup_stats":        _calc_setup_stats(trades[-100:]),
+        "timeframe_stats":    _calc_timeframe_stats(trades),
     }
 
 
