@@ -25,6 +25,8 @@ from pathlib import Path
 DB           = Path(__file__).parent / "signals.db"
 PARAMS_FILE  = Path(__file__).parent / "strategy_params.json"
 MIN_SAMPLES  = 15         # min. geschlossene Auto-KI-Trades je Richtung
+SINGLE_DIR_MIN = 30       # ab so vielen Trades EINER Richtung darf sie allein
+                          # (bei klar negativer Bilanz) abgeschaltet werden
 MIN_BUCKET_N = 3          # min. Trades je 5er-RSI-Bucket, um ihm zu trauen
 MIN_ZONE_W   = 15         # RSI-Zone nie schmaler als das (sonst keine Signale)
 MAX_STEP     = 12         # max. Verschiebung je Grenze pro Lauf → graduell, kein Overfit-Sprung
@@ -125,19 +127,34 @@ def optimize() -> dict:
                                        params.get("sRsiMax", _DEFAULTS["sRsiMax"]))
         setp("sRsiMin", smin); setp("sRsiMax", smax)
 
-    # ── Richtungs-Filter: eine klar unprofitable Richtung abschalten ──────────
-    # Nur wenn BEIDE Richtungen genug Daten haben (sonst kein Urteil).
-    def _expect(rs):
-        return (sum(s["pnl"] for s in rs) / len(rs)) if rs else 0.0
-    if len(longs) >= MIN_SAMPLES and len(shorts) >= MIN_SAMPLES:
-        l_exp, s_exp = _expect(longs), _expect(shorts)
+    # ── Richtungs-Filter: klar unprofitable Richtung abschalten ───────────────
+    # Greift bei STARKER Einzel-Evidenz (≥ SINGLE_DIR_MIN Trades + klar negativ),
+    # auch wenn die Gegenrichtung noch wenig Daten hat — z. B. 82 Shorts @ 20% WR
+    # in einem steigenden Markt. Wird jeden Lernzyklus neu bewertet (regime-adaptiv).
+    def _stats(rs):
+        if not rs:
+            return (0.0, 0.0)
+        return (sum(s["pnl"] for s in rs) / len(rs),
+                sum(1 for s in rs if s["win"]) / len(rs) * 100)
+    l_exp, l_wr = _stats(longs)
+    s_exp, s_wr = _stats(shorts)
+    cur_dir = params.get("dirMode", "both")
+    new_dir = cur_dir
+    short_bad = len(shorts) >= SINGLE_DIR_MIN and s_exp < 0 and s_wr < 40
+    long_bad  = len(longs)  >= SINGLE_DIR_MIN and l_exp < 0 and l_wr < 40
+    if short_bad and not long_bad:
+        new_dir = "long"
+    elif long_bad and not short_bad:
+        new_dir = "short"
+    elif len(longs) >= MIN_SAMPLES and len(shorts) >= MIN_SAMPLES:
         if   l_exp >= 0 and s_exp < 0: new_dir = "long"
         elif s_exp >= 0 and l_exp < 0: new_dir = "short"
         else:                          new_dir = "both"
-        if params.get("dirMode") != new_dir:
-            changed.append(f"dirMode: {params.get('dirMode', 'both')} → {new_dir} "
-                           f"(Ø-PnL Long {l_exp:+.2f}% / Short {s_exp:+.2f}%)")
-            params["dirMode"] = new_dir
+    if new_dir != cur_dir:
+        changed.append(
+            f"dirMode: {cur_dir} → {new_dir} "
+            f"(Long {l_wr:.0f}%/{l_exp:+.1f}% · Short {s_wr:.0f}%/{s_exp:+.1f}%)")
+        params["dirMode"] = new_dir
 
     # Defaults sicherstellen (Browser lädt nur wenn p.lRsiMin existiert)
     for k, v in _DEFAULTS.items():
