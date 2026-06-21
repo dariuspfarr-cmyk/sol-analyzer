@@ -1305,6 +1305,16 @@ def _get_db_signal(state: Optional["State"] = None, return_all: bool = False):
         else:
             continue
 
+        # BLOCK-Regeln IMMER respektieren (auch im Lern-Modus): ein Setup, das das
+        # System als verlierend GELERNT und per BLOCK-Regel gesperrt hat, soll keine
+        # Position öffnen — sonst widerspricht der Trade dem eigenen gelernten Wissen.
+        try:
+            _hour = datetime.now(timezone.utc).hour
+            if any("|BLOCK|" in s for s in _matched_rule_signatures(row, _hour)):
+                continue
+        except Exception:
+            pass
+
         # Contra-HTF Hard-Gate: ≤−2 Alignment = starker HTF-Gegenwind → überspringen
         mtf_a = row.get("mtf_alignment")
         if mtf_a is not None and int(float(mtf_a)) <= -2 and not return_all:
