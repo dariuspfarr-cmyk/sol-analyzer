@@ -2073,6 +2073,58 @@ def _log_error(msg: str) -> None:
 
 
 # ── Haupt-Loop ────────────────────────────────────────────────────────────────
+def _open_new_trades(state: State) -> int:
+    """
+    Eröffnet neue Paper-Trades aus frischen, GERADE getriggerten Signalen.
+    Wird auf jedem Kerzen-Close (run_once) UND alle ~30s im Poll-Loop aufgerufen,
+    damit Auto-KI-Signale realistisch beim Entry getradet werden, bevor der Preis
+    aus der Entry-Zone läuft (sonst würden sie nur theoretisch simuliert).
+    Gibt die Anzahl neu eröffneter Trades zurück.
+    """
+    _pos_cap = MAX_POSITIONS_LEARN if TRADE_EVERY_SIGNAL else MAX_POSITIONS
+    if len(state.positions) >= _pos_cap:
+        return 0
+    opened = 0
+    if TRADE_EVERY_SIGNAL:
+        # ── LERN-MODUS: jedes valide, gerade getriggerte Signal realistisch traden.
+        # Kein Circuit-Breaker / keine Selektion — Ziel ist, für JEDES Signal pro
+        # Timeframe ein reales Ausführungs-Ergebnis zu erzeugen, aus dem die Bots
+        # lernen. Der Entry-Trigger (Realismus) steckt in _get_db_signal/_open_trade.
+        for sig_row in (_get_db_signal(state, return_all=True) or []):
+            if len(state.positions) >= _pos_cap:
+                break
+            before = len(state.positions)
+            _open_trade_from_signal(state, sig_row)
+            if len(state.positions) > before:
+                opened += 1
+        if opened:
+            print(f"  🎓 [Lern-Modus] {opened} neue(s) Signal(e) realistisch "
+                  f"paper-getradet (jedes Signal pro Chart)")
+        return opened
+
+    # ── Selektiv-Modus mit Circuit-Breakern ──
+    today  = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    paused = False
+    if state.loss_pause_until:
+        try:
+            if datetime.now(timezone.utc) < datetime.fromisoformat(state.loss_pause_until):
+                paused = True
+            else:
+                state.loss_pause_until = ""   # Pause abgelaufen
+        except Exception:
+            state.loss_pause_until = ""
+    if not paused and state.daily_date == today and \
+       state.daily_pnl <= -(state.balance * DAILY_LOSS_LIMIT_PCT):
+        paused = True
+    if not paused:
+        sig_row = _get_db_signal(state)
+        if sig_row:
+            before = len(state.positions)
+            _open_trade_from_signal(state, sig_row)
+            opened = len(state.positions) - before
+    return opened
+
+
 def run_once(state: State) -> None:
     """
     Ein einzelner Analyse-Zyklus (läuft auf jedem Kerzen-Close).
@@ -2125,48 +2177,8 @@ def run_once(state: State) -> None:
     # Offenen Trade prüfen
     _check_close(state, df)
 
-    _pos_cap = MAX_POSITIONS_LEARN if TRADE_EVERY_SIGNAL else MAX_POSITIONS
-    if TRADE_EVERY_SIGNAL:
-        # ── LERN-MODUS: jedes valide, gerade getriggerte Signal realistisch traden.
-        # Kein Circuit-Breaker / keine Selektion — Ziel ist, für JEDES Signal pro
-        # Timeframe ein reales Ausführungs-Ergebnis zu erzeugen, aus dem die Bots
-        # lernen. Der Entry-Trigger (Realismus) steckt in _get_db_signal/_open_trade.
-        if len(state.positions) < _pos_cap:
-            opened = 0
-            for sig_row in (_get_db_signal(state, return_all=True) or []):
-                if len(state.positions) >= _pos_cap:
-                    break
-                before = len(state.positions)
-                _open_trade_from_signal(state, sig_row)
-                if len(state.positions) > before:
-                    opened += 1
-            if opened:
-                print(f"  🎓 [Lern-Modus] {opened} neue(s) Signal(e) realistisch "
-                      f"paper-getradet (jedes Signal pro Chart)")
-    elif len(state.positions) < MAX_POSITIONS:
-        today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-        # Circuit-Breaker 1: Pause nach Verlustserie (N Verluste in Folge)
-        paused = False
-        if state.loss_pause_until:
-            try:
-                if datetime.now(timezone.utc) < datetime.fromisoformat(state.loss_pause_until):
-                    paused = True
-                    print(f"  🛑 [Circuit Breaker] Verlustserie-Pause aktiv bis "
-                          f"{state.loss_pause_until[:16]} — kein neuer Trade")
-                else:
-                    state.loss_pause_until = ""   # Pause abgelaufen
-            except Exception:
-                state.loss_pause_until = ""
-        # Circuit-Breaker 2: Tages-Verlust-Limit (-2%)
-        if not paused and state.daily_date == today and \
-           state.daily_pnl <= -(state.balance * DAILY_LOSS_LIMIT_PCT):
-            paused = True
-            print(f"  [Circuit Breaker] Tages-Verlust ${state.daily_pnl:.2f} ≤ "
-                  f"-{DAILY_LOSS_LIMIT_PCT*100:.0f}% — kein neuer Trade heute")
-        if not paused:
-            sig_row = _get_db_signal(state)
-            if sig_row:
-                _open_trade_from_signal(state, sig_row)
+    # Neue Trades eröffnen (läuft auch zwischen den Kerzen alle ~30s, s. run_forever)
+    _open_new_trades(state)
 
     # Kurze Status-Ausgabe
     now_str = datetime.now(timezone.utc).strftime("%H:%M")
@@ -2254,6 +2266,16 @@ def run_forever() -> None:
                 _live_px = _fetch_price()
                 if _live_px:
                     _check_close_live(state, _live_px)   # _finalize_close speichert bei Close
+
+            # ── Frische Signale SOFORT beim Entry aufgreifen (jeden Poll = ~30s) ──
+            # Auto-KI-Signale entstehen am Live-Preis zwischen den Kerzen — hier
+            # werden sie realistisch getradet, solange der Preis noch in der Entry-
+            # Zone liegt (statt nur theoretisch simuliert zu werden).
+            try:
+                if _open_new_trades(state) > 0:
+                    state.save()
+            except Exception as e:
+                _log_error(f"pickup: {e}")
 
             # Periodisches Speichern alle ~10 Minuten auch ohne Trades
             _polls_since_save += 1
