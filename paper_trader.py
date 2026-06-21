@@ -2166,6 +2166,16 @@ def run_once(state: State) -> None:
             strategy_evolver.run()   # ohne force: respektiert MIN_NEW_SIGNALS
         except Exception as e:
             _log_error(f"strategy_evolver (candle): {e}")
+        # Auto-KI-Signale verbessern: aus den realen Outcomes die profitablen
+        # RSI-Zonen lernen → strategy_params.json (Browser wendet sie an).
+        try:
+            import signal_param_optimizer
+            _spo = signal_param_optimizer.optimize()
+            if _spo.get("changed"):
+                print(f"  🧠 [Signal-Lernen] Auto-KI-Parameter verbessert: "
+                      f"{', '.join(_spo['changed'])}")
+        except Exception as e:
+            _log_error(f"signal_param_optimizer: {e}")
 
     # POI-Lern-Zyklus: neue Zonen erkennen + Outcome bestehender POIs aktualisieren
     try:

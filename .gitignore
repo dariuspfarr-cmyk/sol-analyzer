@@ -36,5 +36,6 @@ node_modules/
 poi_log.json
 research_cache.json
 state.json
+strategy_params.json
 trades.csv
 trades.json
