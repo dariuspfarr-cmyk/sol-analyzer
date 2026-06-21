@@ -6531,6 +6531,17 @@ class AutoSignalEngine {
     return false;
   }
 
+  // Multi-Timeframe-Konfluenz: ein Signal gilt nur als präzise, wenn KEIN
+  // höherer Timeframe (Daily- oder 1H-Trend) ihm widerspricht. So ist das Signal
+  // das Ergebnis aller analysierten Timeframes — ohne einen Chart wegzunehmen.
+  _mtfAligned(direction) {
+    const d  = (typeof _ptData !== 'undefined' && _ptData) ? _ptData : {};
+    const dt = d.daily_trend || 'neutral';
+    const ht = d.h1_trend    || 'neutral';
+    const against = direction === 'long' ? 'bearish' : 'bullish';
+    return dt !== against && ht !== against;   // kein HTF widerspricht
+  }
+
   _scanRecent() {
     if (!this.active) return;
     const candles = this.chart.candles;
@@ -6541,8 +6552,6 @@ class AutoSignalEngine {
       return;
     }
     this._scanRetries = 0;
-    // Gelernter Timeframe-Block: auf toxischen TFs (z. B. 4h) gar nicht erst scannen
-    if (_autoKiBlocks.timeframes.includes(lvInterval_)) return;
     const { rsiMin, rsiMax, sRsiMin, sRsiMax, pivotLB } = this._getParams();
     const dirMode = (document.getElementById('bt-dir')?.value) || 'both';  // gelernte Richtung
     let allSigs = btSignals(candles, ema200, ema55, rsiArr, atr, volMA||[], pivotLB,
@@ -6550,6 +6559,9 @@ class AutoSignalEngine {
     // Gelernte Setup-Blocklist (z. B. 'bounce'/Zone) herausfiltern
     if (_autoKiBlocks.signalTypes.length)
       allSigs = allSigs.filter(s => !_autoKiBlocks.signalTypes.includes(s.signalType));
+    // ── MULTI-TIMEFRAME-KONFLUENZ: nur Signale, die die höheren Timeframes
+    //    (Daily + 1H Trend) bestätigen → maximal präzise (4h bleibt erhalten).
+    allSigs = allSigs.filter(s => this._mtfAligned(s.direction));
     const currentPrice = candles[candles.length - 1].c;
     // Zuerst alle vorhandenen Chart-Signale auf Aktualität prüfen
     this._pruneStaleSignals();
@@ -6625,8 +6637,6 @@ class AutoSignalEngine {
   onClosedCandle(candles) {
     if (!this.active || candles.length < 60) return;
     if (!this.chart.indicators.ema200) return;
-    // Gelernter Timeframe-Block: auf toxischen TFs keine Signale erzeugen
-    if (_autoKiBlocks.timeframes.includes(lvInterval_)) return;
 
     // Neue Kerze → Log-Dedup zurücksetzen (neue Signale immer loggbar)
     this._lastLoggedKey = null;
@@ -6645,6 +6655,8 @@ class AutoSignalEngine {
         rsiArr, atr, volMA||[], pivotLB, rsiMin, rsiMax, sRsiMin, sRsiMax, dirMode);
       if (_autoKiBlocks.signalTypes.length)
         allSigs = allSigs.filter(s => !_autoKiBlocks.signalTypes.includes(s.signalType));
+      // Multi-Timeframe-Konfluenz: nur von Daily+1H bestätigte Signale
+      allSigs = allSigs.filter(s => this._mtfAligned(s.direction));
 
       const idx = candles.length - 1;
       const inds2 = this.chart.indicators;

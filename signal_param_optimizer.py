@@ -179,20 +179,21 @@ def optimize() -> dict:
             f"(Long {l_wr:.0f}%/{l_exp:+.1f}% · Short {s_wr:.0f}%/{s_exp:+.1f}%)")
         params["dirMode"] = new_dir
 
-    # ── Setup-Blocklist (Punkt 3) + Timeframe-Blocklist (Punkt 4) ─────────────
-    # Toxische Auto-KI-Setups/TFs (z. B. Zone/Bounce 3.7% WR, 4h 2.6% WR) ganz
-    # abschalten — die Browser-Engine erzeugt sie dann nicht mehr.
+    # ── Setup-Blocklist (Punkt 3) ────────────────────────────────────────────
+    # Toxischen Setup-Typ (z. B. Zone/Bounce 3.7% WR) abschalten. KEIN Timeframe-
+    # Blocking — die Präzision je TF kommt aus der Multi-Timeframe-Konfluenz im
+    # Browser (ein Signal muss von den höheren TFs bestätigt sein), nicht durch
+    # Wegnehmen eines Charts.
     sig_blocks = sorted({_SETUP_TO_SIGTYPE.get(k, k.lower())
                          for k, n, wr in _block_by(samples, "setup")})
-    tf_blocks  = sorted({k for k, n, wr in _block_by(samples, "tf")})
     if sig_blocks != sorted(params.get("blockedSignalTypes", [])):
         info = ", ".join(f"{k} {wr}%" for k, n, wr in _block_by(samples, "setup"))
         changed.append(f"blockedSignalTypes → {sig_blocks} ({info})")
         params["blockedSignalTypes"] = sig_blocks
-    if tf_blocks != sorted(params.get("blockedTFs", [])):
-        info = ", ".join(f"{k} {wr}%" for k, n, wr in _block_by(samples, "tf"))
-        changed.append(f"blockedTFs → {tf_blocks} ({info})")
-        params["blockedTFs"] = tf_blocks
+    # Frühere TF-Blocklist nicht mehr verwenden (4h bleibt erhalten)
+    if params.get("blockedTFs"):
+        params["blockedTFs"] = []
+        changed.append("blockedTFs → [] (kein TF-Blocking; MTF-Konfluenz stattdessen)")
 
     # Defaults sicherstellen (Browser lädt nur wenn p.lRsiMin existiert)
     for k, v in _DEFAULTS.items():
