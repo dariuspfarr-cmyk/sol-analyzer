@@ -4,17 +4,17 @@
   "confidence": 0.86,
   "score": -5,
   "metrics": {
-    "price": 71.58,
-    "ema20w": 89.51,
-    "ema40w": 108.81,
-    "ma200d": 97.8,
-    "rsi_weekly": 34.7,
+    "price": 74.35,
+    "ema20w": 89.78,
+    "ema40w": 108.94,
+    "ma200d": 97.46,
+    "rsi_weekly": 37.3,
     "ath": 253.51,
-    "ath_dist_pct": -71.8,
-    "above_52w_low_x": 1.19,
+    "ath_dist_pct": -70.7,
+    "above_52w_low_x": 1.24,
     "hh_hl_score": 0.55,
-    "price_vs_ema20w_pct": -20.0,
-    "price_vs_ma200d_pct": -26.8
+    "price_vs_ema20w_pct": -17.2,
+    "price_vs_ma200d_pct": -23.7
   },
   "playbook": {
     "name": "Bärenmarkt",
@@ -35,5 +35,5 @@
     "premium_penalty": -5.0,
     "signal_score_boost": -12.0
   },
-  "detected_at": "2026-06-20T10:32:46.449367+00:00"
+  "detected_at": "2026-06-21T18:35:51.258061+00:00"
 }
