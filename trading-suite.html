@@ -8366,7 +8366,7 @@ function ptRender(d) {
       const sep = idx > 0 ? '<div style="border-top:1px solid #1e1e28;margin:8px 0"></div>' : '';
       return `${sep}
         <div style="display:flex;justify-content:space-between;margin-bottom:4px">
-          <span style="color:${col};font-weight:700;font-size:12px">${arrow} ${pos.direction.toUpperCase()} <span style="color:#555;font-size:10px">${pos.setup_type||''}</span></span>
+          <span style="color:${col};font-weight:700;font-size:12px">${arrow} ${pos.direction.toUpperCase()} <span style="color:#555;font-size:10px">${pos.setup_type||''}</span>${pos.timeframe ? ` <span style="background:#161628;color:#9a9ab8;font-size:9px;font-weight:700;padding:1px 5px;border-radius:3px;letter-spacing:.3px">${String(pos.timeframe).toUpperCase()}</span>` : ''}${pos.signal_id != null ? ` <span style="color:#3c3c52;font-size:9px;font-family:'Courier New',monospace">#${pos.signal_id}</span>` : ''}</span>
           ${upnl !== null ? `<span style="color:${g(upnl)};font-weight:600">${fmt(upnl, '$')}</span>` : ''}
         </div>
         <div class="lv-pos-row"><span style="color:#444">Entry</span><span class="mono">$${Number(pos.entry).toFixed(2)}</span></div>
@@ -8579,7 +8579,7 @@ function lvLogFilter() {
       <span style="color:${t.direction==='long'?'#089981':'#f23645'}">${dir}</span>
       <div style="min-width:0">
         <div style="color:#888;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">$${Number(t.entry||0).toFixed(2)} → ${exit}</div>
-        <div style="font-size:9px;color:#333">${dt}</div>
+        <div style="font-size:9px;color:#333;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${dt}${t.setup_type?` · ${t.setup_type}`:''}${t.timeframe?` · <span style="color:#6a6a82;font-weight:700">${String(t.timeframe).toUpperCase()}</span>`:''}${t.signal_id!=null?` · <span style="font-family:'Courier New',monospace;color:#3c3c52">#${t.signal_id}</span>`:''}</div>
       </div>
       <div style="text-align:right">
         <div style="color:${col};font-family:'Courier New',monospace;white-space:nowrap">${pnl}$</div>
