@@ -33,6 +33,7 @@ BASE          = Path(__file__).parent
 AUDIT_LOG     = BASE / "live_orders.log"      # jede Aktion (Dry-Run & echt)
 KILL_SWITCH   = BASE / "LIVE_KILL"            # existiert → Halt neuer Orders
 DAILY_FILE    = BASE / "live_daily.json"      # Tages-PnL-Tracking (echt)
+POS_FILE      = BASE / "live_positions.json"  # offene (echte/Dry-Run) Positionen
 
 # ══ HARTE SICHERHEITS-SCHALTER (Default: maximal sicher) ════════════════════
 LIVE_TRADING_ENABLED = False   # Master-Schalter. False ⇒ niemals echte Orders.
@@ -121,6 +122,71 @@ def record_realized_pnl(pnl_usd: float) -> None:
         DAILY_FILE.write_text(json.dumps(d), encoding="utf-8")
     except Exception:
         pass
+
+
+# ── Offene Live-Positionen verfolgen (echt & Dry-Run) ────────────────────────
+# Damit die Exposure-/Anzahl-Limits real greifen UND Positionen geschlossen
+# werden können. Im Dry-Run ist das die Generalprobe des kompletten Lebenszyklus.
+def get_open_live_positions() -> list:
+    try:
+        return json.loads(POS_FILE.read_text(encoding="utf-8"))
+    except Exception:
+        return []
+
+
+def _save_live_positions(positions: list) -> None:
+    try:
+        POS_FILE.write_text(json.dumps(positions, indent=2, ensure_ascii=False),
+                            encoding="utf-8")
+    except Exception:
+        pass
+
+
+def _record_open(order_desc: dict, dry_run: bool, exchange_order_id=None) -> None:
+    positions = get_open_live_positions()
+    positions.append({**order_desc, "dry_run": dry_run,
+                      "exchange_order_id": exchange_order_id,
+                      "opened_at": datetime.now(timezone.utc).isoformat()})
+    _save_live_positions(positions)
+
+
+def close_position(signal_id, exit_price: float, reason: str = "") -> dict:
+    """
+    Schließt die zu signal_id gehörende Live-Position — schließt den Lebenszyklus.
+    Echt: reduce-only Market-Order + realisierten PnL fürs Tages-Limit verbuchen.
+    Dry-Run: nur simulieren/loggen (kein echtes Geld berührt).
+    """
+    positions = get_open_live_positions()
+    pos = next((p for p in positions if p.get("meta", {}).get("signal_id") == signal_id), None)
+    if pos is None:
+        return {"closed": False, "reason": "keine Live-Position zu diesem Signal"}
+
+    entry = float(pos.get("entry", 0) or 0)
+    size  = float(pos.get("size", 0) or 0)
+    side  = pos.get("side")
+    pnl   = (exit_price - entry) * size if side == "buy" else (entry - exit_price) * size
+
+    rest = [p for p in positions if p is not pos]
+    _save_live_positions(rest)
+
+    if pos.get("dry_run") or DRY_RUN or not is_armed()[0]:
+        _audit("dry_run_close", {"signal_id": signal_id, "exit": exit_price,
+                                 "pnl": round(pnl, 4), "reason": reason})
+        return {"closed": True, "dry_run": True, "pnl": round(pnl, 4)}
+
+    # ── ECHTES Schließen ──
+    try:
+        ex = _make_exchange()
+        opp = "sell" if side == "buy" else "buy"
+        ex.create_order(pos["symbol"], "market", opp, size, None, {"reduceOnly": True})
+        record_realized_pnl(pnl)
+        _audit("live_close", {"signal_id": signal_id, "exit": exit_price,
+                              "pnl": round(pnl, 4), "reason": reason})
+        return {"closed": True, "dry_run": False, "pnl": round(pnl, 4)}
+    except Exception as e:
+        _save_live_positions(positions)   # bei Fehler Position behalten
+        _audit("live_close_error", {"signal_id": signal_id, "error": str(e)})
+        return {"closed": False, "reason": f"Close-Fehler: {e}"}
 
 
 # ── Risiko-Prüfung jeder Order ────────────────────────────────────────────────
@@ -219,9 +285,11 @@ def place_order(symbol: str, direction: str, size: float, entry: float,
                   "entry": entry, "sl": sl, "tp": tp, "notional": round(notional, 2),
                   "meta": meta or {}}
 
-    # Dry-Run ODER nicht scharf → nur loggen, NICHT platzieren
+    # Dry-Run ODER nicht scharf → nur loggen + Position verfolgen (Generalprobe),
+    # aber NICHT an die Börse senden.
     if DRY_RUN or not armed:
         _audit("dry_run_order", {**order_desc, "armed": armed, "arm_reason": reason})
+        _record_open(order_desc, dry_run=True)
         return {"placed": False, "dry_run": True, "reason": reason if not armed else "DRY_RUN",
                 "order": order_desc}
 
@@ -239,6 +307,7 @@ def place_order(symbol: str, direction: str, size: float, entry: float,
         except Exception as e:
             _audit("protective_order_failed", {"symbol": symbol, "error": str(e)})
         _audit("live_order_placed", {**order_desc, "exchange_order_id": order.get("id")})
+        _record_open(order_desc, dry_run=False, exchange_order_id=order.get("id"))
         return {"placed": True, "dry_run": False, "order": order_desc,
                 "exchange_order_id": order.get("id")}
     except Exception as e:
@@ -260,7 +329,7 @@ def mirror_paper_trade(position: dict, open_live_positions: list | None = None) 
     return place_order(
         "SOLUSDT", position.get("direction", "long"), live_size, entry,
         float(position.get("sl", 0) or 0), float(position.get("tp", 0) or 0),
-        open_live_positions or [],
+        open_live_positions if open_live_positions is not None else get_open_live_positions(),
         meta={"signal_id": position.get("signal_id"),
               "setup": position.get("setup_type"),
               "tf": position.get("timeframe")},

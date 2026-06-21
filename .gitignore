@@ -44,3 +44,4 @@ trades.json
 live_orders.log
 live_daily.json
 LIVE_KILL
+live_positions.json

@@ -1887,6 +1887,15 @@ def _finalize_close(state: State, p: dict, exit_price: float, reason: str,
     state.trades = state.trades[-500:]
     state.positions.remove(p)
 
+    # ── Live-Position schließen (schließt den Lebenszyklus echten Tradings) ───
+    # No-Op, wenn keine Live-Position zu diesem Signal existiert (= alles außer
+    # gespiegelten Auto-KI-Signalen). Im Dry-Run wird der Close nur simuliert.
+    try:
+        import live_trading
+        live_trading.close_position(p.get("signal_id"), exit_price, reason)
+    except Exception as e:
+        _log_error(f"live_trading close: {e}")
+
     # ── 1. Outcome + MFE/MAE auf ORIGINAL Signal-Row zurückschreiben ──────────
     sig_id = p.get("signal_id")
     if sig_id:
