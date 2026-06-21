@@ -1645,6 +1645,17 @@ def _open_trade_from_signal(state: State, sig_row: dict) -> None:
           f"Gebühr=${entry_fee:.2f}  Risiko={risk_mult:.2f}x ({risk_usd:.2f}$)  "
           f"Setup={sig_row.get('setup_type','')}  Signal-ID={sig_row.get('id')}")
 
+    # ── Spiegelung an ECHTES Trading (nur Auto-KI-Signale) ──────────────────
+    # Standardmäßig ein NO-OP/Dry-Run — live_trading.py ist hart abgesichert und
+    # platziert ohne explizites Scharfschalten KEINE echte Order. So sind diese
+    # Signale „perfekt möglich" mit echtem Geld nachzutraden, sobald freigeschaltet.
+    if sig_row.get("routing") == "autoki":
+        try:
+            import live_trading
+            live_trading.mirror_paper_trade(state.positions[-1])
+        except Exception as e:
+            _log_error(f"live_trading mirror: {e}")
+
 
 def _check_close_one(state: State, p: dict, df: pd.DataFrame) -> Optional[dict]:
     """Per-Position SL/TP-Check — Trade läuft bis SL oder TP getroffen wird."""

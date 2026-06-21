@@ -39,3 +39,8 @@ state.json
 strategy_params.json
 trades.csv
 trades.json
+
+# Live-Trading Laufzeit-/Sicherheitsdateien (nie committen)
+live_orders.log
+live_daily.json
+LIVE_KILL
