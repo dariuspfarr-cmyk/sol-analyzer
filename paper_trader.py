@@ -1368,8 +1368,11 @@ def _get_db_signal(state: Optional["State"] = None, return_all: bool = False):
         return [] if return_all else None
 
     scored.sort(key=lambda x: x[0], reverse=True)
-    # Lern-Modus: ALLE valide getriggerten Signale zurückgeben (jedes wird getradet)
+    # Lern-Modus: ALLE validen Signale zurückgeben — Auto-KI-Signale ZUERST
+    # (Haupt-Priorität: sie werden bevorzugt eröffnet, falls das Positions-Limit
+    # je knapp wird), danach nach Score.
     if return_all:
+        scored.sort(key=lambda x: (x[1].get("routing") == "autoki", x[0]), reverse=True)
         return [r for _, r in scored]
 
     # Selektiv-Modus: bestes Signal — Live-Preis als realistischen Fill mitgeben
@@ -2163,19 +2166,12 @@ def run_once(state: State) -> None:
     if n_resolved and n_resolved > 0:
         try:
             import strategy_evolver
+            # Voller Lernzyklus: backtest_learner → performance → threshold_optimizer
+            # → XGBoost → strategy_builder → Auto-KI-Signal-Optimizer (alle Bots
+            # koordiniert; signal_param_optimizer ist Schritt 6 im Evolver).
             strategy_evolver.run()   # ohne force: respektiert MIN_NEW_SIGNALS
         except Exception as e:
             _log_error(f"strategy_evolver (candle): {e}")
-        # Auto-KI-Signale verbessern: aus den realen Outcomes die profitablen
-        # RSI-Zonen lernen → strategy_params.json (Browser wendet sie an).
-        try:
-            import signal_param_optimizer
-            _spo = signal_param_optimizer.optimize()
-            if _spo.get("changed"):
-                print(f"  🧠 [Signal-Lernen] Auto-KI-Parameter verbessert: "
-                      f"{', '.join(_spo['changed'])}")
-        except Exception as e:
-            _log_error(f"signal_param_optimizer: {e}")
 
     # POI-Lern-Zyklus: neue Zonen erkennen + Outcome bestehender POIs aktualisieren
     try:

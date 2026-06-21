@@ -201,6 +201,27 @@ def run(force: bool = False) -> dict:
     except Exception as e:
         entry["actions"].append(f"Strategie-Builder: Fehler ({e})")
 
+    # ── 6. AUTO-KI-SIGNALE optimieren (HAUPT-PRIORITÄT) ──────────────────────
+    # Lernt aus den realen Outcomes die profitablen RSI-Zonen + Richtung der
+    # Auto-KI-Signale (BREAK/BOUNCE) und schreibt strategy_params.json, das die
+    # Live-Signal-Engine anwendet. Alle Lern-Bots oben liefern Gewichte/Thresholds/
+    # Regeln; dieser Schritt richtet die SIGNAL-ERZEUGUNG selbst auf Profit aus.
+    try:
+        import signal_param_optimizer
+        spo = signal_param_optimizer.optimize()
+        if spo.get("changed"):
+            entry["actions"].append(
+                "Auto-KI-Signale optimiert: " + " · ".join(spo["changed"]))
+            entry["autoki_optimized"] = spo["changed"]
+            print(f"  🎯 Auto-KI-Signale verbessert (Long {spo['longs']} / "
+                  f"Short {spo['shorts']} Trades): {', '.join(spo['changed'])}")
+        else:
+            entry["actions"].append(
+                f"Auto-KI-Signale: keine Änderung (Long {spo['longs']} / "
+                f"Short {spo['shorts']} Trades)")
+    except Exception as e:
+        entry["actions"].append(f"Auto-KI-Signal-Optimizer: Fehler ({e})")
+
     # ── Abschluss ─────────────────────────────────────────────────────────────
     entry["metrics_after"] = _current_metrics()
 

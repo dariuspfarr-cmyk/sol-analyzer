@@ -77,9 +77,12 @@ def _best_rsi_zone(samples: list[dict], lo_cur: float, hi_cur: float):
         d["n"]   += 1
         d["w"]   += 1 if s["win"] else 0
         d["pnl"] += s["pnl"]
-    # Buckets mit genug Daten, die NICHT klar verlieren (WR ≥ 45%) = behaltenswert
+    # PROFIT-FOKUS: behalte Buckets mit positiver Erwartung (Ø-PnL ≥ 0) und
+    # nicht-katastrophaler WR. Trimmt die Zone auf die real PROFITABLEN RSI-Bereiche.
     keep = sorted(b for b, d in buckets.items()
-                  if d["n"] >= MIN_BUCKET_N and d["w"] / d["n"] >= 0.45)
+                  if d["n"] >= MIN_BUCKET_N
+                  and d["pnl"] / d["n"] >= 0.0
+                  and d["w"] / d["n"] >= 0.40)
     if not keep:
         return lo_cur, hi_cur, {"buckets": buckets, "keep": []}
     tgt_lo, tgt_hi = float(min(keep)), float(max(keep) + 5)
@@ -121,6 +124,20 @@ def optimize() -> dict:
         smin, smax, _ = _best_rsi_zone(shorts, params.get("sRsiMin", _DEFAULTS["sRsiMin"]),
                                        params.get("sRsiMax", _DEFAULTS["sRsiMax"]))
         setp("sRsiMin", smin); setp("sRsiMax", smax)
+
+    # ── Richtungs-Filter: eine klar unprofitable Richtung abschalten ──────────
+    # Nur wenn BEIDE Richtungen genug Daten haben (sonst kein Urteil).
+    def _expect(rs):
+        return (sum(s["pnl"] for s in rs) / len(rs)) if rs else 0.0
+    if len(longs) >= MIN_SAMPLES and len(shorts) >= MIN_SAMPLES:
+        l_exp, s_exp = _expect(longs), _expect(shorts)
+        if   l_exp >= 0 and s_exp < 0: new_dir = "long"
+        elif s_exp >= 0 and l_exp < 0: new_dir = "short"
+        else:                          new_dir = "both"
+        if params.get("dirMode") != new_dir:
+            changed.append(f"dirMode: {params.get('dirMode', 'both')} → {new_dir} "
+                           f"(Ø-PnL Long {l_exp:+.2f}% / Short {s_exp:+.2f}%)")
+            params["dirMode"] = new_dir
 
     # Defaults sicherstellen (Browser lädt nur wenn p.lRsiMin existiert)
     for k, v in _DEFAULTS.items():
