@@ -1221,13 +1221,19 @@ def _get_db_signal(state: Optional["State"] = None, return_all: bool = False):
                 closed_ts = datetime.fromisoformat(
                     (t.get("closed_at") or t.get("opened_at") or "")).timestamp()
                 if closed_ts >= dedup_key_cutoff:
-                    recently_traded.add((t.get("setup_type", ""), t.get("direction", "")))
+                    recently_traded.add((t.get("timeframe", ""),
+                                         t.get("setup_type", ""), t.get("direction", "")))
             except Exception:
                 pass
         for pos in state.positions:
             if pos.get("signal_id"):
                 open_sig_ids.add(pos["signal_id"])
-            open_combos.add((pos.get("setup_type", ""), pos.get("direction", "")))
+            open_combos.add((pos.get("timeframe", ""),
+                             pos.get("setup_type", ""), pos.get("direction", "")))
+
+    # Innerhalb DIESES Durchlaufs schon gewählte Kombis (Timeframe+Setup+Richtung)
+    # → verhindert, dass mehrere fast identische Signale gleichzeitig getradet werden.
+    seen_combos: set = set()
 
     for row in candidates:
         src   = (row.get("source") or "LIVE").upper()
@@ -1248,17 +1254,26 @@ def _get_db_signal(state: Optional["State"] = None, return_all: bool = False):
         if setup_type in active_cooldowns and not return_all:
             continue
 
-        # Dedup-Filter: kein erneuter Eintritt in gleiches Setup+Richtung innerhalb DEDUP_HOURS
+        # Dedup nach (Timeframe, Setup, Richtung) — gilt in BEIDEN Modi, damit ein
+        # Signal nie doppelt getradet wird, distinkte Signale (anderer TF/Setup/
+        # Richtung) aber weiterhin alle gehandelt werden.
         bias      = row.get("bias", "neutral")
         direction = "long" if bias == "bullish" else "short"
-        if (setup_type, direction) in recently_traded and not return_all:
-            continue
+        tf        = row.get("timeframe", "4h")
+        combo     = (tf, setup_type, direction)
 
-        # Offene-Positionen-Filter: dasselbe Signal nie doppelt öffnen (immer aktiv).
-        # Gleiche Setup+Richtung-Kombi nur im Selektiv-Modus sperren.
+        # 1) Dasselbe Signal (ID) nie doppelt öffnen
         if row.get("id") in open_sig_ids:
             continue
-        if (setup_type, direction) in open_combos and not return_all:
+        # 2) Kürzlich dieselbe Kombi getradet (innerhalb DEDUP_HOURS)
+        if combo in recently_traded:
+            continue
+        # 3) Dieselbe Kombi bereits offen
+        if combo in open_combos:
+            continue
+        # 4) In DIESEM Durchlauf bereits gewählt (Lern-Modus: Schutz vor fast
+        #    identischen Signalen; Selektiv-Modus wählt ohnehin nur das beste)
+        if return_all and combo in seen_combos:
             continue
 
         # ── Entry-Trigger: Preis muss JETZT in der Entry-Zone liegen ──────────
@@ -1346,6 +1361,7 @@ def _get_db_signal(state: Optional["State"] = None, return_all: bool = False):
             continue   # Adaptiver Floor: schlechtere Signale bei schlechter Performance ignorieren
         row["_composite_score"] = round(score, 2)
         row["_live_price"]      = current_price
+        seen_combos.add(combo)   # Kombi gewählt → keine weitere identische in diesem Lauf
         scored.append((score, row))
 
     if not scored:
