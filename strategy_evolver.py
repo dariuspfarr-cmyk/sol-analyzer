@@ -201,6 +201,17 @@ def run(force: bool = False) -> dict:
     except Exception as e:
         entry["actions"].append(f"Strategie-Builder: Fehler ({e})")
 
+    # ── Trend-Kontext erfassen (für Regime-/Trendwechsel-Lernen) ─────────────
+    try:
+        import trend_detector
+        tr = trend_detector.current_trend()
+        entry["trend"] = {"state": tr["state"], "score": tr["score"],
+                          "daily": tr["daily"], "h1": tr["h1"], "phase": tr["phase"]}
+        entry["actions"].append(
+            f"Trend: {tr['state']} (Daily={tr['daily']} 1H={tr['h1']} ADX={tr['adx']})")
+    except Exception:
+        pass
+
     # ── 6. AUTO-KI-SIGNALE optimieren (HAUPT-PRIORITÄT) ──────────────────────
     # Lernt aus den realen Outcomes die profitablen RSI-Zonen + Richtung der
     # Auto-KI-Signale (BREAK/BOUNCE) und schreibt strategy_params.json, das die

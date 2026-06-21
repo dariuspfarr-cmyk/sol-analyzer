@@ -135,6 +135,27 @@ def optimize() -> dict:
 
     changed: list[str] = []
 
+    # ── TRENDWECHSEL: regime-spezifisches Lernen zurücksetzen ─────────────────
+    # Bei einem Trendwechsel (v. a. up↔down) passt das im alten Regime Gelernte
+    # nicht mehr (z. B. „nur Long" aus der Bullenphase). dirMode + Setup-Blocklist
+    # werden zurückgesetzt, damit der Bot für die NEUE Phase neu lernt; die
+    # MTF-Konfluenz im Browser steuert die Richtung ohnehin schon live mit.
+    cur_trend = None
+    try:
+        import trend_detector
+        tc = trend_detector.check_change()
+        cur_trend = tc.get("to")
+        if tc.get("changed") and (params.get("dirMode", "both") != "both"
+                                  or params.get("blockedSignalTypes")):
+            params["dirMode"] = "both"
+            params["blockedSignalTypes"] = []
+            changed.append(
+                f"Trendwechsel {tc['from']}→{tc['to']}"
+                + (" (Richtungs-Flip)" if tc.get("direction_flip") else "")
+                + " → dirMode/Blocklist zurückgesetzt (neu lernen für neue Phase)")
+    except Exception:
+        pass
+
     def setp(k, v):
         v = round(float(v))
         if int(params.get(k, _DEFAULTS.get(k, 0))) != v:
@@ -178,6 +199,15 @@ def optimize() -> dict:
             f"dirMode: {cur_dir} → {new_dir} "
             f"(Long {l_wr:.0f}%/{l_exp:+.1f}% · Short {s_wr:.0f}%/{s_exp:+.1f}%)")
         params["dirMode"] = new_dir
+
+    # Trend-Abgleich (Schluss-Instanz): ein aus alten Daten gelernter dirMode darf
+    # die vom AKTUELLEN Trend gestützte Richtung nicht blockieren. Bei Trend „down"
+    # aber dirMode „long" (oder umgekehrt) → auf „both" zurück, MTF-Konfluenz steuert.
+    if (cur_trend == "down" and params.get("dirMode") == "long") or \
+       (cur_trend == "up" and params.get("dirMode") == "short"):
+        if params.get("dirMode") != "both":
+            changed.append(f"dirMode an aktuellen Trend ({cur_trend}) angepasst → both")
+            params["dirMode"] = "both"
 
     # ── Setup-Blocklist (Punkt 3) ────────────────────────────────────────────
     # Toxischen Setup-Typ (z. B. Zone/Bounce 3.7% WR) abschalten. KEIN Timeframe-

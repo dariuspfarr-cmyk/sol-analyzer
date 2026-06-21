@@ -45,3 +45,4 @@ live_orders.log
 live_daily.json
 LIVE_KILL
 live_positions.json
+trend_state.json
