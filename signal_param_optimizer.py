@@ -27,8 +27,13 @@ PARAMS_FILE  = Path(__file__).parent / "strategy_params.json"
 MIN_SAMPLES  = 15         # min. geschlossene Auto-KI-Trades je Richtung
 SINGLE_DIR_MIN = 30       # ab so vielen Trades EINER Richtung darf sie allein
                           # (bei klar negativer Bilanz) abgeschaltet werden
-BLOCK_MIN    = 20         # min. Trades, um ein Setup/TF als toxisch zu blocken
-BLOCK_WR     = 30.0       # WR-Schwelle: darunter (+ negativ) = toxisch → blocken
+BLOCK_MIN    = 20         # min. Trades, um ein Setup als toxisch zu blocken
+BLOCK_WR     = 15.0       # nur WIRKLICH kaputte Setups blocken (z. B. Zone 0.8%).
+                          # Direktional schwache (z. B. BOS-Shorts) regeln dirMode
+                          # + MTF-Konfluenz — kein Blocken eines ganzen Setup-Typs.
+RECENCY_HALFLIFE = 25     # Halbwertszeit (Trades) der Recency-Gewichtung: ein
+                          # Trade von vor 25 Trades zählt nur noch halb → der Bot
+                          # folgt flexibel dem aktuellen Markt statt der Historie
 MIN_BUCKET_N = 3          # min. Trades je 5er-RSI-Bucket, um ihm zu trauen
 MIN_ZONE_W   = 15         # RSI-Zone nie schmaler als das (sonst keine Signale)
 MAX_STEP     = 12         # max. Verschiebung je Grenze pro Lauf → graduell, kein Overfit-Sprung
@@ -47,11 +52,18 @@ def _load_autoki_closed() -> list[dict]:
     c = sqlite3.connect(DB); c.row_factory = sqlite3.Row
     rows = [dict(r) for r in c.execute(
         "SELECT trigger_reason, bias, outcome, pnl_pct, setup_type, timeframe "
-        "FROM signals WHERE routing='autoki' AND outcome IN ('WIN','LOSS')").fetchall()]
+        "FROM signals WHERE routing='autoki' AND outcome IN ('WIN','LOSS') "
+        "ORDER BY id").fetchall()]
+    n = len(rows)
     out = []
-    for r in rows:
+    for i, r in enumerate(rows):
         m = _RSI_RE.search(r.get("trigger_reason") or "")
         rsi = float(m.group(1)) if m else None
+        # Recency-Gewicht: jüngste Trades zählen am meisten (Halbwertszeit
+        # RECENCY_HALFLIFE Trades) → der Bot passt sich IMMER ans aktuelle
+        # Marktverhalten an, statt von alten Daten dominiert zu werden.
+        age = (n - 1) - i
+        rw  = 0.5 ** (age / RECENCY_HALFLIFE)
         out.append({
             "rsi": rsi,
             "dir": "long" if r.get("bias") == "bullish" else "short",
@@ -59,22 +71,33 @@ def _load_autoki_closed() -> list[dict]:
             "pnl": float(r.get("pnl_pct") or 0.0),
             "setup": r.get("setup_type") or "?",
             "tf":    r.get("timeframe") or "?",
+            "rw":    rw,
         })
     return out
 
 
 def _block_by(samples: list[dict], key: str):
-    """Findet toxische Ausprägungen (≥ BLOCK_MIN Trades, WR < BLOCK_WR, Ø-PnL < 0)."""
+    """
+    Findet toxische Ausprägungen. Stichproben-Schwelle über die ROHE Trade-Zahl
+    (≥ BLOCK_MIN), WR/Ø-PnL aber RECENCY-GEWICHTET → spiegelt das aktuelle Markt-
+    verhalten, nicht alte Phasen.
+    """
     from collections import defaultdict
-    agg: dict = defaultdict(lambda: {"n": 0, "w": 0, "pnl": 0.0})
+    agg: dict = defaultdict(lambda: {"n": 0, "sw": 0.0, "win": 0.0, "pnl": 0.0})
     for s in samples:
-        d = agg[s[key]]
-        d["n"] += 1; d["w"] += 1 if s["win"] else 0; d["pnl"] += s["pnl"]
+        d = agg[s[key]]; rw = s["rw"]
+        d["n"]   += 1
+        d["sw"]  += rw
+        d["win"] += rw if s["win"] else 0.0
+        d["pnl"] += rw * s["pnl"]
     blocked = []
     for k, d in agg.items():
-        if (d["n"] >= BLOCK_MIN and d["w"] / d["n"] * 100 < BLOCK_WR
-                and d["pnl"] / d["n"] < 0):
-            blocked.append((k, d["n"], round(d["w"] / d["n"] * 100, 1)))
+        if d["sw"] <= 0:
+            continue
+        wr  = d["win"] / d["sw"] * 100
+        exp = d["pnl"] / d["sw"]
+        if d["n"] >= BLOCK_MIN and wr < BLOCK_WR and exp < 0:
+            blocked.append((k, d["n"], round(wr, 1)))
     return blocked
 
 
@@ -97,16 +120,18 @@ def _best_rsi_zone(samples: list[dict], lo_cur: float, hi_cur: float):
     buckets: dict = {}
     for s in samples:
         b = int(s["rsi"] // 5) * 5
-        d = buckets.setdefault(b, {"n": 0, "w": 0, "pnl": 0.0})
+        d = buckets.setdefault(b, {"n": 0, "sw": 0.0, "win": 0.0, "pnl": 0.0})
+        rw = s["rw"]
         d["n"]   += 1
-        d["w"]   += 1 if s["win"] else 0
-        d["pnl"] += s["pnl"]
-    # PROFIT-FOKUS: behalte Buckets mit positiver Erwartung (Ø-PnL ≥ 0) und
-    # nicht-katastrophaler WR. Trimmt die Zone auf die real PROFITABLEN RSI-Bereiche.
+        d["sw"]  += rw
+        d["win"] += rw if s["win"] else 0.0
+        d["pnl"] += rw * s["pnl"]
+    # PROFIT-FOKUS, recency-gewichtet: behalte Buckets mit positiver Erwartung
+    # (Ø-PnL ≥ 0) und nicht-katastrophaler WR — gemessen am aktuellen Markt.
     keep = sorted(b for b, d in buckets.items()
-                  if d["n"] >= MIN_BUCKET_N
-                  and d["pnl"] / d["n"] >= 0.0
-                  and d["w"] / d["n"] >= 0.40)
+                  if d["n"] >= MIN_BUCKET_N and d["sw"] > 0
+                  and d["pnl"] / d["sw"] >= 0.0
+                  and d["win"] / d["sw"] >= 0.40)
     if not keep:
         return lo_cur, hi_cur, {"buckets": buckets, "keep": []}
     tgt_lo, tgt_hi = float(min(keep)), float(max(keep) + 5)
@@ -176,10 +201,12 @@ def optimize() -> dict:
     # auch wenn die Gegenrichtung noch wenig Daten hat — z. B. 82 Shorts @ 20% WR
     # in einem steigenden Markt. Wird jeden Lernzyklus neu bewertet (regime-adaptiv).
     def _stats(rs):
-        if not rs:
+        # recency-gewichtete Erwartung & WR (jüngste Trades zählen am meisten)
+        sw = sum(s["rw"] for s in rs)
+        if sw <= 0:
             return (0.0, 0.0)
-        return (sum(s["pnl"] for s in rs) / len(rs),
-                sum(1 for s in rs if s["win"]) / len(rs) * 100)
+        return (sum(s["rw"] * s["pnl"] for s in rs) / sw,
+                sum(s["rw"] for s in rs if s["win"]) / sw * 100)
     l_exp, l_wr = _stats(longs)
     s_exp, s_wr = _stats(shorts)
     cur_dir = params.get("dirMode", "both")
