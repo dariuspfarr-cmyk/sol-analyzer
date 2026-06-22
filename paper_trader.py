@@ -1536,10 +1536,14 @@ def _open_trade_from_signal(state: State, sig_row: dict) -> None:
     risk_mult = max(MIN_RISK_MULT, min(MAX_RISK_MULT, risk_mult))
 
     if TRADE_EVERY_SIGNAL:
-        # Lern-Modus: FIXE Positionsgröße je Trade, entkoppelt vom geteilten Kapital
-        # → jedes Signal kann realistisch getradet werden, ohne dass nach wenigen
-        # Trades das Kapital blockt. Slippage/Gebühren/SL-TP-Realismus bleiben.
-        notional = LEARN_TRADE_NOTIONAL
+        # Lern-Modus: Basis-Größe je Trade, aber WR-/SCORE-GEWICHTET — die gelernte
+        # Win-Rate spielt damit auch hier ein: bessere Signale (höherer Composite-
+        # Score aus den WR-Deltas) bekommen mehr Kapital, schwächere weniger; nach
+        # Verlustserien greift zusätzlich der Drawdown-Schutz (in risk_mult). Bleibt
+        # vom geteilten Kapital entkoppelt (kein Block nach wenigen Trades);
+        # Slippage/Gebühren/SL-TP-Realismus bleiben. Das Lernen je Setup nutzt
+        # weiterhin pnl_pct (größenunabhängig), bleibt also fair.
+        notional = LEARN_TRADE_NOTIONAL * risk_mult
         size     = notional / entry
         risk_usd = size * sl_dist
     else:
