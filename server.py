@@ -693,17 +693,35 @@ class Handler(SimpleHTTPRequestHandler):
             return False
         return True
 
-    def do_GET(self):
-        if self.path.startswith("/api/"):
+    def _dispatch_api(self) -> None:
+        """Führt das API-Routing aus und fängt Fehler ab, damit ein einzelner
+        fehlerhafter Request (z. B. kaputtes JSON) nie die Verbindung killt."""
+        try:
             if not self._route():
                 self._send_json({"error": "unknown endpoint"}, 404)
+        except json.JSONDecodeError:
+            self._send_json({"error": "invalid JSON body"}, 400)
+        except (ValueError, KeyError) as e:
+            self._send_json({"error": f"bad request: {e}"}, 400)
+        except Exception as e:  # noqa: BLE001 — letzte Verteidigung gegen 000-Resets
+            import traceback
+            try:
+                with open(BASE / "error.log", "a", encoding="utf-8") as f:
+                    f.write(f"[server] {self.command} {self.path}: {e}\n"
+                            f"{traceback.format_exc()}\n")
+            except Exception:
+                pass
+            self._send_json({"error": "internal server error"}, 500)
+
+    def do_GET(self):
+        if self.path.startswith("/api/"):
+            self._dispatch_api()
             return
         super().do_GET()
 
     def do_POST(self):
         if self.path.startswith("/api/"):
-            if not self._route():
-                self._send_json({"error": "unknown endpoint"}, 404)
+            self._dispatch_api()
             return
         self.send_response(405)
         self.end_headers()
