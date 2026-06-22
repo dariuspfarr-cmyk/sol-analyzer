@@ -47,3 +47,17 @@ live_daily.json
 LIVE_KILL
 live_positions.json
 trend_state.json
+
+# Laufzeit-mutierte Dateien — werden vom Bot bei jedem Lauf neu geschrieben und
+# sollen NICHT getrackt werden (sonst kollidiert jeder Deploy-Pull mit ihnen).
+# config.json wird vom threshold_optimizer angepasst; config.py faellt auf
+# BOUNDS-Defaults zurueck, wenn die Datei fehlt (fresh clone bleibt lauffaehig).
+config.json
+improvements.json
+IMPROVEMENTS.md
+bull_run_cache.json
+daily_performance.json
+.last_backtest_live_count
+.last_backtest_run
+.last_daily_summary
+.last_weekly_run
