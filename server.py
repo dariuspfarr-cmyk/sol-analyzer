@@ -435,6 +435,24 @@ def api_strategy_rules() -> dict:
         return {"error": str(e)}
 
 
+def api_strategy_ranking() -> dict:
+    """Bewertung aller Strategie-Profile (auto-Selektor) + aktives Profil."""
+    import json as _j
+    try:
+        import strategy_selector
+        ranking = strategy_selector.evaluate_all()
+        active  = "balanced"
+        pinned  = False
+        af = BASE / "active_strategy.json"
+        if af.exists():
+            ad = _j.loads(af.read_text(encoding="utf-8"))
+            active = ad.get("profile_id", "balanced")
+            pinned = bool(ad.get("pinned"))
+        return {"active": active, "pinned": pinned, "ranking": ranking}
+    except Exception as e:
+        return {"error": str(e)}
+
+
 def api_strategy_activate(body: bytes) -> dict:
     """Aktiviert ein Strategie-Profil. Body: {"profile_id": "..."}"""
     import json as _j
@@ -665,6 +683,8 @@ class Handler(SimpleHTTPRequestHandler):
             self._send_json(api_learning())
         elif path == "/api/strategy-rules":
             self._send_json(api_strategy_rules())
+        elif path == "/api/strategy-ranking":
+            self._send_json(api_strategy_ranking())
         elif path == "/api/strategy-activate" and self.command == "POST":
             length = int(self.headers.get("Content-Length", 0))
             body   = self.rfile.read(length) if length else b"{}"

@@ -233,6 +233,22 @@ def run(force: bool = False) -> dict:
     except Exception as e:
         entry["actions"].append(f"Auto-KI-Signal-Optimizer: Fehler ({e})")
 
+    # ── 7. BESTE STRATEGIE automatisch aktivieren ───────────────────────────
+    # Bewertet alle vom strategy_builder erzeugten Profile an den realen Outcomes
+    # und schaltet (mit Hysterese) auf die stärkste um — der Paper Trader tradet
+    # damit immer die aktuell beste Strategie, statt eines manuell fixen Profils.
+    try:
+        import strategy_selector
+        sel = strategy_selector.select(write=True)
+        if sel.get("changed"):
+            entry["actions"].append(f"Strategie umgeschaltet → {sel['to']} ({sel['reason']})")
+            entry["strategy_switch"] = {"from": sel["from"], "to": sel["to"]}
+            print(f"  🔀 Beste Strategie aktiviert: {sel['from']} → {sel['to']}")
+        else:
+            entry["actions"].append(f"Strategie-Auswahl: {sel.get('reason', 'unverändert')}")
+    except Exception as e:
+        entry["actions"].append(f"Strategie-Selektor: Fehler ({e})")
+
     # ── Abschluss ─────────────────────────────────────────────────────────────
     entry["metrics_after"] = _current_metrics()
 

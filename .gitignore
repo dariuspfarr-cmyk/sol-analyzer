@@ -17,6 +17,7 @@ performance_report.json
 rule_performance.json
 strategy_evolution.json
 strategy_rules.json
+strategy_selection.json
 routing_report.json
 
 # Python

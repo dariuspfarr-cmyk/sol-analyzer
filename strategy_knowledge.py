@@ -115,18 +115,22 @@ def _effectiveness(sig: str, perf: dict) -> float:
 
 
 # ── Zentrale Auswertung ───────────────────────────────────────────────────────
-def evaluate(setup_type: str, bias: str, zone: str, hour: int) -> tuple[float, list[str]]:
+def evaluate(setup_type: str, bias: str, zone: str, hour: int,
+             profile_id: str | None = None) -> tuple[float, list[str]]:
     """
     Wendet alle passenden Regeln an, gefiltert durch das aktive Profil und
     gewichtet mit Konfidenz × Live-Effektivität.
     Gibt (score_modifier, matched_signatures) zurück.
+
+    profile_id überschreibt das aktive Profil (für die Profil-Bewertung im
+    strategy_selector — gleiche Logik, kein Duplikat).
     """
     doc = _load_rules_doc()
     all_rules: list = doc.get("rules", [])
     if not all_rules:
         return 0.0, []
 
-    pid      = _load_active_profile().get("profile_id", "balanced")
+    pid      = profile_id or _load_active_profile().get("profile_id", "balanced")
     prof     = doc.get("profiles", {}).get(pid, {})
     r_types  = prof.get("rule_types")
     s_filter = prof.get("strength_filter")
