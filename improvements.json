@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-06-21T18:23:01.180634+00:00",
+  "generated_at": "2026-06-22T11:13:28.024330+00:00",
   "items": [
     {
       "id": "7f9b89582e",
@@ -11,9 +11,9 @@
       "source": "performance_report.json",
       "file": "",
       "first_seen": "2026-06-18T19:38:26.941114+00:00",
-      "occurrences": 40,
+      "occurrences": 41,
       "status": "done",
-      "last_seen": "2026-06-21T18:23:01.180634+00:00"
+      "last_seen": "2026-06-22T11:13:28.024330+00:00"
     },
     {
       "id": "8af0bb8ad1",
@@ -25,9 +25,9 @@
       "source": "performance_report.json",
       "file": "",
       "first_seen": "2026-06-18T19:38:26.941114+00:00",
-      "occurrences": 40,
+      "occurrences": 41,
       "status": "done",
-      "last_seen": "2026-06-21T18:23:01.180634+00:00"
+      "last_seen": "2026-06-22T11:13:28.024330+00:00"
     },
     {
       "id": "21ffb57f84",
@@ -39,9 +39,9 @@
       "source": "performance_report.json",
       "file": "",
       "first_seen": "2026-06-18T19:38:26.941114+00:00",
-      "occurrences": 40,
+      "occurrences": 41,
       "status": "done",
-      "last_seen": "2026-06-21T18:23:01.180634+00:00"
+      "last_seen": "2026-06-22T11:13:28.024330+00:00"
     },
     {
       "id": "17ba66e1b0",
@@ -53,9 +53,9 @@
       "source": "performance_report.json",
       "file": "",
       "first_seen": "2026-06-21T12:52:06.295678+00:00",
-      "occurrences": 3,
+      "occurrences": 4,
       "status": "open",
-      "last_seen": "2026-06-21T18:23:01.180634+00:00"
+      "last_seen": "2026-06-22T11:13:28.024330+00:00"
     },
     {
       "id": "4b06a925cd",
@@ -67,23 +67,23 @@
       "source": "performance_report.json",
       "file": "",
       "first_seen": "2026-06-18T19:38:26.941114+00:00",
-      "occurrences": 40,
+      "occurrences": 41,
       "status": "done",
-      "last_seen": "2026-06-21T18:23:01.180634+00:00"
+      "last_seen": "2026-06-22T11:13:28.024330+00:00"
     },
     {
       "id": "ccb79dfaa6",
       "category": "trading",
       "priority": "P1",
-      "title": "Win-Rate sinkt (70% → 59%)",
-      "detail": "Mittlere Win-Rate fiel von 69.8% auf zuletzt 58.7% (aktuell 58.7%).",
+      "title": "Win-Rate sinkt (68% → 59%)",
+      "detail": "Mittlere Win-Rate fiel von 68.4% auf zuletzt 58.7% (aktuell 58.7%).",
       "action": "WIN-RATE IST DAS HAUPTZIEL. Regime-Wechsel prüfen (Reversal- vs Trend-Setups), Selektivität erhöhen, verlierende Setups/Regime härter filtern. Ggf. backtester.py nutzen, um optimale Schwellen zu finden.",
       "source": "strategy_evolution.json",
       "file": "",
       "first_seen": "2026-06-19T11:30:35.096632+00:00",
-      "occurrences": 25,
+      "occurrences": 26,
       "status": "open",
-      "last_seen": "2026-06-21T18:23:01.180634+00:00"
+      "last_seen": "2026-06-22T11:13:28.024330+00:00"
     },
     {
       "id": "87a45b8065",
@@ -95,23 +95,23 @@
       "source": "strategy_evolution.json",
       "file": "",
       "first_seen": "2026-06-20T10:32:58.304074+00:00",
-      "occurrences": 8,
+      "occurrences": 9,
       "status": "open",
-      "last_seen": "2026-06-21T18:23:01.180634+00:00"
+      "last_seen": "2026-06-22T11:13:28.024330+00:00"
     },
     {
       "id": "93d9bb9171",
       "category": "quality",
       "priority": "P3",
-      "title": "paper_trader.py ist sehr groß (2535 Zeilen)",
-      "detail": "paper_trader.py hat 2535 Zeilen — schwer zu überblicken/testen.",
+      "title": "paper_trader.py ist sehr groß (2545 Zeilen)",
+      "detail": "paper_trader.py hat 2545 Zeilen — schwer zu überblicken/testen.",
       "action": "In thematische Module aufteilen (z. B. Execution/Sizing/Indikatoren), wie bereits bei pt_indicators.py begonnen.",
       "source": "code-metrics",
       "file": "paper_trader.py",
       "first_seen": "2026-06-18T19:38:26.941114+00:00",
-      "occurrences": 40,
+      "occurrences": 41,
       "status": "wontfix",
-      "last_seen": "2026-06-21T18:23:01.180634+00:00"
+      "last_seen": "2026-06-22T11:13:28.024330+00:00"
     }
   ]
 }
