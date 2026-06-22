@@ -6706,8 +6706,7 @@ class AutoSignalEngine {
         const key = this._sigKey(s);
         if (key !== this._lastLoggedKey) {
           this._lastLoggedKey = key;
-          this._addToLog(s, candles[idx]);
-          if (s.conf == null || s.conf > 0.42) this._showAlert(s, candles[idx]);
+          this._addToLog(s, candles[idx], {alert: (s.conf == null || s.conf > 0.42)});
         }
       });
       this._updateActivePanel(validSigs[0], candles[idx]);
@@ -6790,63 +6789,68 @@ class AutoSignalEngine {
     </div>`;
   }
 
-  _addToLog(sig, candle) {
+  _addToLog(sig, candle, opts={}) {
+    // Server-Autorität: erst prüfen, ob der Paper Trader dieses Signal nach seinen
+    // Regeln auch wirklich tradet. Nur handelbare Signale werden angezeigt + auf
+    // dem Chart belassen — abgelehnte verschwinden wieder (tauchen nicht auf).
+    const entry = sig.entryPrice || candle.c;
+    fetch('/api/signals/submit', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        direction: sig.direction, entry, sl: sig.sl, tp: sig.tp, rsi: sig.rsi,
+        label: sig.label || 'AUTO_KI', conf: sig.conf != null ? sig.conf : 0.5,
+        timeframe: lvInterval_ || '4h',
+      })
+    }).then(r => r.json()).then(res => {
+      if (!res || !res.ok) { console.warn('[AutoKI] Server-Fehler:', res && res.error); return; }
+      if (res.tradeable === false) {
+        // Vom Paper Trader nach Regeln abgelehnt → vom Chart nehmen, nicht loggen
+        this.chart.signals = (this.chart.signals || []).filter(c => c.idx !== sig.idx);
+        this.chart.render();
+        const sigEl = document.getElementById('lv-activeSig');
+        if (sigEl) sigEl.innerHTML =
+          `<div style="color:var(--muted);font-size:11px;display:flex;align-items:center;gap:6px"><span class="dot di"></span>Signal nicht handelbar — ${res.reason||'von Regeln abgelehnt'}</div>`;
+        return;
+      }
+      this._renderSignalCard(sig, candle, res);
+      if (opts.alert) this._showAlert(sig, candle, res);
+    }).catch(() => { console.warn('[AutoKI] Server nicht erreichbar'); });
+  }
+
+  _renderSignalCard(sig, candle, res) {
     const isL=sig.direction==='long', col=isL?'#089981':'#f23645';
     const d=new Date(); const ts=d.toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'});
     const conf=sig.conf!=null?`<span style="color:${col}">${Math.round(sig.conf*100)}% KI</span>`:'';
     const qs=sig.quality?.score??null;
     const qCol=qs>=75?'#4ade80':qs>=62?'#fbbf24':'#a78bfa';
     const qTag=qs!=null?`<span style="font-size:9px;color:${qCol};font-weight:700"> · Q${qs}</span>`:'';
+    const planned=(res.entry_planned!=null?res.entry_planned:(sig.entryPrice||candle.c));
+    const fill=(res.entry_fill!=null?res.entry_fill:planned);
+    const rr=(res.rr_fill!=null?res.rr_fill:null);
+    const typeTag=`<span style="font-size:9px;background:${col}20;color:${col};padding:1px 5px;border-radius:2px;margin-left:4px">${sig.label||'BOUNCE'}</span>`;
     const card=document.createElement('div');
     card.className=`lv-sig-card ${sig.direction}`;
-    const typeTag=`<span style="font-size:9px;background:${col}20;color:${col};padding:1px 5px;border-radius:2px;margin-left:4px">${sig.label||'BOUNCE'}</span>`;
-    // Status-Indicator: wird nach Server-Antwort aktualisiert
-    const statusId = 'sig-status-' + Date.now();
     card.innerHTML=`
       <div style="display:flex;justify-content:space-between;align-items:center">
         <span style="color:${col};font-weight:700;font-size:12px">${isL?'▲ LONG':'▼ SHORT'}${typeTag}</span>
         <span style="color:var(--muted);font-size:10px">${ts}</span>
       </div>
-      <div style="font-size:11px;color:var(--muted);margin-top:3px">$${candle.c.toFixed(2)} · RSI ${sig.rsi.toFixed(1)}${conf?' · '+conf:''}${qTag}</div>
-      <div id="${statusId}" style="font-size:9px;color:#444;margin-top:2px">→ wird an Paper Trader übergeben…</div>`;
+      <div style="font-size:11px;color:var(--muted);margin-top:3px">RSI ${sig.rsi.toFixed(1)}${conf?' · '+conf:''}${qTag}</div>
+      <div style="display:grid;grid-template-columns:auto auto;gap:1px 8px;font-size:10px;margin-top:4px">
+        <span style="color:var(--muted)">Entry (geplant)</span><span style="color:#fff;text-align:right">$${planned.toFixed(2)}</span>
+        <span style="color:var(--muted)">Order-Fill (PT)</span><span style="color:${col};font-weight:700;text-align:right">$${fill.toFixed(2)}</span>
+        ${rr!=null?`<span style="color:var(--muted)">R:R</span><span style="color:var(--dim);text-align:right">1:${rr}</span>`:''}
+      </div>
+      <div style="font-size:9px;color:#089981;margin-top:3px">✓ #${res.signal_id} — Paper Trader tradet @ $${fill.toFixed(2)}</div>`;
     const log=document.getElementById('lv-sigLog');
     if (log) { log.insertBefore(card,log.firstChild); if(log.children.length>20) log.lastChild?.remove(); }
     const cnt=document.getElementById('lv-sigCount');
     if (cnt) cnt.textContent=(log?.children.length||0)+'';
-    this.signals.push({...sig, price:candle.c, time:Date.now()});
-
-    // Signal an Python-Server senden → signals.db → Paper Trader
-    const entry = sig.entryPrice || candle.c;
-    fetch('/api/signals/submit', {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({
-        direction: sig.direction,
-        entry:     entry,
-        sl:        sig.sl,
-        tp:        sig.tp,
-        rsi:       sig.rsi,
-        label:     sig.label || 'AUTO_KI',
-        conf:      sig.conf != null ? sig.conf : 0.5,
-        timeframe: lvInterval_ || '4h',
-      })
-    }).then(r => r.json()).then(res => {
-      const el = document.getElementById(statusId);
-      if (!el) return;
-      if (res.ok) {
-        el.textContent = `✓ Signal #${res.signal_id} in DB — Paper Trader übernimmt`;
-        el.style.color = '#089981';
-      } else {
-        el.textContent = '⚠ Server-Fehler: ' + (res.error || '?');
-        el.style.color = '#f23645';
-      }
-    }).catch(() => {
-      const el = document.getElementById(statusId);
-      if (el) { el.textContent = '⚠ Server nicht erreichbar'; el.style.color = '#f23645'; }
-    });
+    this.signals.push({...sig, price:candle.c, entryPrice:planned, entryFill:fill, time:Date.now()});
   }
 
-  _showAlert(sig, candle) {
+  _showAlert(sig, candle, res) {
     // Remove previous
     document.querySelectorAll('.lv-alert').forEach(el=>el.remove());
     const isL=sig.direction==='long', col=isL?'#089981':'#f23645';
@@ -6854,13 +6858,16 @@ class AutoSignalEngine {
     div.className=`lv-alert ${sig.direction}`;
     const isBreak = sig.signalType==='breakout';
     const title = isL ? `▲ LONG ${sig.label||'BOUNCE'}` : `▼ SHORT ${sig.label||'BOUNCE'}`;
+    const planned=(res&&res.entry_planned!=null?res.entry_planned:(sig.entryPrice||candle.c));
+    const fill=(res&&res.entry_fill!=null?res.entry_fill:planned);
     div.innerHTML=`
       <div style="display:flex;justify-content:space-between;align-items:center">
         <span style="color:${col};font-weight:700;font-size:13px">${title}</span>
         <span onclick="this.closest('.lv-alert').remove()" style="cursor:pointer;color:var(--muted);font-size:18px;line-height:1">×</span>
       </div>
       <div style="font-size:11px;color:var(--muted);margin-top:8px;display:grid;grid-template-columns:1fr 1fr;gap:3px">
-        <span>Entry:</span><strong style="color:#fff">$${candle.c.toFixed(2)}</strong>
+        <span>Entry (geplant):</span><strong style="color:#fff">$${planned.toFixed(2)}</strong>
+        <span>Order-Fill (PT):</span><strong style="color:${col}">$${fill.toFixed(2)}</strong>
         <span>RSI:</span><span style="color:#7b61ff">${sig.rsi.toFixed(1)}</span>
         ${sig.tl?.projY?`<span>TL:</span><span style="color:${col}">$${sig.tl.projY.toFixed(2)}</span>`:''}
       </div>

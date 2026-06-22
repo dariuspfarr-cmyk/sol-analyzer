@@ -1305,15 +1305,16 @@ def _get_db_signal(state: Optional["State"] = None, return_all: bool = False):
         else:
             continue
 
-        # BLOCK-Regeln IMMER respektieren (auch im Lern-Modus): ein Setup, das das
-        # System als verlierend GELERNT und per BLOCK-Regel gesperrt hat, soll keine
-        # Position öffnen — sonst widerspricht der Trade dem eigenen gelernten Wissen.
+        # Demote statt Hard-Block: ein als schwach GELERNTES Setup (BLOCK-Regel) wird
+        # NICHT mehr komplett gesperrt. Stattdessen senkt die Regel den Composite-Score
+        # (siehe _score_signal) und das Signal muss den Score-Floor schlagen — auch im
+        # Lern-Modus (siehe unten). So lernt der Bot, WANN z. B. ein BOS hilft, statt
+        # BOS pauschal zu blocken, und tradet nie allein auf Basis eines schwachen Setups.
         try:
             _hour = datetime.now(timezone.utc).hour
-            if any("|BLOCK|" in s for s in _matched_rule_signatures(row, _hour)):
-                continue
+            row["_is_demoted"] = any("|BLOCK|" in s for s in _matched_rule_signatures(row, _hour))
         except Exception:
-            pass
+            row["_is_demoted"] = False
 
         # Contra-HTF Hard-Gate: ≤−2 Alignment = starker HTF-Gegenwind → überspringen
         mtf_a = row.get("mtf_alignment")
@@ -1378,8 +1379,12 @@ def _get_db_signal(state: Optional["State"] = None, return_all: bool = False):
 
         score = _score_signal(row, market_bias, hourly_perf, weights, sig_map)
         floor = _dynamic_score_floor(state) if state else MIN_SCORE_FLOOR
-        if score < floor and not return_all:
-            continue   # Adaptiver Floor: schlechtere Signale bei schlechter Performance ignorieren
+        # Demotete Setups (gelernte Verlierer) müssen den Floor IMMER schlagen — auch
+        # im Lern-Modus. Nur wenn der Gesamt-Kontext (Regime/Stunde/MTF/Volumen/
+        # Confluence) sie über die Schwelle hebt, werden sie getradet ("nicht allein
+        # auf Basis des Setups"). Nicht-demotete Signale behalten den Lern-Modus-Freipass.
+        if score < floor and (not return_all or row.get("_is_demoted")):
+            continue   # Adaptiver Floor: schwache Signale bei schlechter Performance ignorieren
         row["_composite_score"] = round(score, 2)
         row["_live_price"]      = current_price
         seen_combos.add(combo)   # Kombi gewählt → keine weitere identische in diesem Lauf
@@ -1404,6 +1409,178 @@ def _get_db_signal(state: Optional["State"] = None, return_all: bool = False):
               f"gewählt: {best_row.get('setup_type','')} {best_row.get('bias','')} "
               f"Score={best_score:.1f} (Markt={market_bias})")
     return best_row
+
+
+def _scoring_context() -> tuple:
+    """Markt-Kontext für _score_signal: (market_bias, hourly_perf, weights, sig_map).
+    Zentral, damit _get_db_signal und evaluate_autoki dieselbe Basis scoren."""
+    market_bias = "neutral"
+    hourly_perf: dict = {}
+    try:
+        import web_researcher
+        market_bias = web_researcher.get_market_bias()
+    except Exception:
+        pass
+    try:
+        import json as _json, backtest_learner
+        _wf = backtest_learner.WEIGHTS_FILE
+        if _wf.exists():
+            with open(_wf, encoding="utf-8") as _f:
+                hourly_perf = _json.load(_f).get("hourly_performance", {})
+    except Exception:
+        pass
+    weights = learning_engine.load_weights()
+    sig_map = {
+        "BOS": "bos", "CHOCH": "choch", "FVG": "fvg", "OB": "order_block",
+        "EQH": "eqh", "EQL": "eql", "DISCOUNT": "discount_zone", "PREMIUM": "premium_zone",
+    }
+    return market_bias, hourly_perf, weights, sig_map
+
+
+def evaluate_autoki(direction: str, entry: float, sl: float, tp: float,
+                    timeframe: str = "4h", rsi: float = 50.0,
+                    label: str = "AUTO_KI", conf: float = 0.5,
+                    state: Optional["State"] = None) -> dict:
+    """
+    Bewertet ein FRISCHES Auto-KI-Signal nach exakt denselben Regeln, die der
+    Paper Trader zum Öffnen nutzt — BEVOR es in der DB landet. So entsteht ein
+    Auto-KI-Signal nur, wenn der Paper Trader es auch wirklich traden würde
+    ("durch die Regeln entstanden, nicht einfach so"). Nicht handelbare Signale
+    werden gar nicht erst gespeichert/angezeigt.
+
+    Spiegelt die Lern-Modus-Gates aus _get_db_signal + die Open-Checks aus
+    _open_trade_from_signal: R:R, max. Stop-Distanz, Dedup, Entry-Zonen-Trigger,
+    realer Fill inkl. MIN_RR, Kapazität, News-Block. Schwach gelernte Setups
+    (BLOCK-Regeln) werden NICHT hart gesperrt, müssen aber den Score-Floor
+    schlagen (Kontext muss sie tragen) — sonst nicht handelbar.
+
+    Rückgabe: {tradeable, entry_planned, entry_fill, rr_fill, reason}
+      entry_planned = idealer Entry laut Signal/Chart-Engine
+      entry_fill    = realer Order-Preis, wo der Paper Trader füllt (Markt +
+                      Slippage); None wenn nicht handelbar.
+    """
+    def _no(reason: str) -> dict:
+        return {"tradeable": False,
+                "entry_planned": round(float(entry or 0), 4),
+                "entry_fill": None, "rr_fill": None, "reason": reason}
+
+    try:
+        entry = float(entry); sl = float(sl); tp = float(tp)
+    except (TypeError, ValueError):
+        return _no("ungültige Preiswerte")
+    if entry <= 0 or sl <= 0 or tp <= 0:
+        return _no("Entry/SL/TP fehlen oder ≤ 0")
+
+    bias = "bullish" if direction == "long" else "bearish"
+    setup_map = {"BREAK": "BOS", "BREAKOUT": "BOS",
+                 "BOUNCE": "Zone", "REVERSAL": "CHoCH"}
+    first_word = (label or "").upper().split()[0] if (label or "").strip() else ""
+    setup_type = setup_map.get(first_word, "Zone")
+
+    sl_dist = abs(entry - sl)
+    if sl_dist < 1e-6:
+        return _no("SL-Distanz zu klein")
+    if (abs(tp - entry) / sl_dist) < 1.0:
+        return _no("R:R < 1 (Setup invalide)")
+
+    # Strukturell zu weiter Stop für diesen Timeframe → Position säße fest
+    try:
+        import tf_profiles
+        if (sl_dist / entry) > tf_profiles.max_risk_pct(timeframe):
+            return _no("Stop zu weit für diesen Timeframe")
+    except Exception:
+        pass
+
+    # Demote-Flag: ein als schwach GELERNTES Setup (BLOCK-Regel) wird NICHT hart
+    # gesperrt, muss aber unten den Score-Floor schlagen (Kontext muss es tragen).
+    row = {"setup_type": setup_type, "bias": bias, "timeframe": timeframe,
+           "all_triggers": json.dumps([f"RSI_{int(rsi)}", setup_type, "AUTO_KI"]),
+           "zone_position": "neutral", "confidence_score": conf,
+           "source": "LIVE", "volume_ratio": 1.0}
+    _hour = datetime.now(timezone.utc).hour
+    try:
+        is_demoted = any("|BLOCK|" in s for s in _matched_rule_signatures(row, _hour))
+    except Exception:
+        is_demoted = False
+
+    # Dedup + Kapazität (gleiche Kombi offen / kürzlich getradet)
+    combo = (timeframe, setup_type, direction)
+    if state:
+        for pos in state.positions:
+            if (pos.get("timeframe", ""), pos.get("setup_type", ""),
+                    pos.get("direction", "")) == combo:
+                return _no("gleiche Kombi bereits offen")
+        cutoff = time.time() - DEDUP_HOURS * 3600
+        for t in state.trades[-15:]:
+            try:
+                cts = datetime.fromisoformat(
+                    t.get("closed_at") or t.get("opened_at") or "").timestamp()
+            except Exception:
+                continue
+            if cts >= cutoff and (t.get("timeframe", ""), t.get("setup_type", ""),
+                                  t.get("direction", "")) == combo:
+                return _no(f"gleiche Kombi vor <{DEDUP_HOURS:.0f}h getradet")
+        pos_cap = MAX_POSITIONS_LEARN if TRADE_EVERY_SIGNAL else MAX_POSITIONS
+        if len(state.positions) >= pos_cap:
+            return _no("Positions-Limit erreicht")
+
+    # Live-Preis + Entry-Zonen-Trigger: Preis muss JETZT realistisch triggern
+    price = _fetch_price()
+    if not price or price <= 0:
+        return _no("kein Live-Preis verfügbar")
+    sp = _load_strategy_params()
+    zone_frac  = max(0.10, min(0.60, float(sp.get("entry_zone_frac",  ENTRY_ZONE_FRAC))))
+    chase_frac = max(0.02, min(0.40, float(sp.get("entry_chase_frac", ENTRY_CHASE_FRAC))))
+    if bias == "bullish":
+        if price <= sl:                          return _no("Preis unter SL — Setup ungültig")
+        if price >= tp:                          return _no("Ziel bereits erreicht")
+        if price > entry + sl_dist * chase_frac: return _no("Preis weggelaufen — kein Nachjagen")
+        if price < entry - sl_dist * zone_frac:  return _no("Preis zu weit unter der Zone")
+    else:
+        if price >= sl:                          return _no("Preis über SL — Setup ungültig")
+        if price <= tp:                          return _no("Ziel bereits erreicht")
+        if price < entry - sl_dist * chase_frac: return _no("Preis weggelaufen — kein Nachjagen")
+        if price > entry + sl_dist * zone_frac:  return _no("Preis zu weit über der Zone")
+
+    # Realer Fill = Markt + Slippage (identisch zu _open_trade_from_signal)
+    slip = price * SLIPPAGE_PCT / 100.0
+    fill = price + slip if direction == "long" else price - slip
+    fill = round(fill, PRICE_DECIMALS)
+    if direction == "long":
+        if fill <= sl or fill >= tp:             return _no("Fill bereits jenseits SL/TP")
+    else:
+        if fill >= sl or fill <= tp:             return _no("Fill bereits jenseits SL/TP")
+    fill_dist = abs(fill - sl)
+    if fill_dist < 1e-6:
+        return _no("Fill-SL-Distanz zu klein")
+    rr_fill = round(abs(tp - fill) / fill_dist, 2)
+    if rr_fill < MIN_RR:
+        return _no(f"reales R:R {rr_fill:.2f} < {MIN_RR} nach Live-Fill")
+
+    # News-Block: kein neuer Trade innerhalb ±2h eines High-Impact Events
+    try:
+        if _is_news_blocked():
+            return _no("News-Block (High-Impact Event ±2h)")
+    except Exception:
+        pass
+
+    # Demote-Floor: ein schwach gelerntes Setup (BLOCK-Regel) wird nur getradet,
+    # wenn der Gesamt-Kontext (Regime/Stunde/MTF/Volumen) den Composite-Score über
+    # den Floor hebt — sonst nicht "auf eigener Basis" traden. Der Bot lernt damit,
+    # WANN z. B. ein BOS hilft, statt BOS pauschal zu blocken.
+    if is_demoted:
+        try:
+            mb, hp, wts, smap = _scoring_context()
+            score = _score_signal(row, mb, hp, wts, smap)
+            floor = _dynamic_score_floor(state) if state else MIN_SCORE_FLOOR
+            if score < floor:
+                return _no(f"schwaches Setup — Kontext bestätigt nicht "
+                           f"(Score {score:.0f} < Floor {floor:.0f})")
+        except Exception:
+            pass
+
+    return {"tradeable": True, "entry_planned": round(entry, 4),
+            "entry_fill": fill, "rr_fill": rr_fill, "reason": "handelbar"}
 
 
 # ── Trade-Ausführung ──────────────────────────────────────────────────────────

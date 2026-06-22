@@ -166,21 +166,49 @@ def api_stats() -> dict:
 
 
 def api_submit_signal(body: dict) -> dict:
-    """Empfängt ein Auto-KI-Signal vom Browser und speichert es in signals.db."""
+    """Empfängt ein Auto-KI-Signal vom Browser, prüft es gegen die echten
+    Paper-Trader-Regeln und speichert es NUR, wenn der Paper Trader es auch
+    wirklich traden würde. So entsteht jedes angezeigte Signal "durch die Regeln"
+    und der Trader handelt alle angezeigten. Nicht handelbare Signale werden
+    nicht gespeichert (tauchen gar nicht erst auf). Antwort enthält den geplanten
+    Entry UND den realen Fill-Preis, wo der Paper Trader die Order platziert."""
     try:
-        import signal_logger
+        import signal_logger, paper_trader
+        direction = body.get("direction", "long")
+        entry     = float(body.get("entry", 0))
+        sl        = float(body.get("sl", 0))
+        tp        = float(body.get("tp", 0))
+        rsi       = float(body.get("rsi", 50))
+        label     = str(body.get("label", "AUTO_KI"))
+        conf      = float(body.get("conf") or 0.5)
+        timeframe = str(body.get("timeframe", "4h"))
+
+        # Aktuellen Paper-Trader-State laden (für Dedup/Kapazitäts-Prüfung)
+        try:
+            st = paper_trader.State(); st.load()
+        except Exception:
+            st = None
+        verdict = paper_trader.evaluate_autoki(
+            direction, entry, sl, tp, timeframe=timeframe,
+            rsi=rsi, label=label, conf=conf, state=st)
+
+        if not verdict.get("tradeable"):
+            # Nicht handelbar → nicht speichern, nicht traden, nicht anzeigen
+            return {"ok": True, "tradeable": False,
+                    "reason":        verdict.get("reason"),
+                    "entry_planned": verdict.get("entry_planned"),
+                    "entry_fill":    verdict.get("entry_fill")}
+
         sig_id = signal_logger.log_autoki_signal(
-            direction = body.get("direction", "long"),
-            entry     = float(body.get("entry", 0)),
-            sl        = float(body.get("sl", 0)),
-            tp        = float(body.get("tp", 0)),
-            rsi       = float(body.get("rsi", 50)),
-            label     = str(body.get("label", "AUTO_KI")),
-            conf      = float(body.get("conf") or 0.5),
-            timeframe = str(body.get("timeframe", "4h")),
+            direction=direction, entry=entry, sl=sl, tp=tp, rsi=rsi,
+            label=label, conf=conf, timeframe=timeframe,
         )
         _sse_broadcast("new_signal", {"signal_id": sig_id, "source": "AUTO_KI"})
-        return {"ok": True, "signal_id": sig_id}
+        return {"ok": True, "tradeable": True, "signal_id": sig_id,
+                "entry_planned": verdict.get("entry_planned"),
+                "entry_fill":    verdict.get("entry_fill"),
+                "rr_fill":       verdict.get("rr_fill"),
+                "reason":        verdict.get("reason")}
     except Exception as e:
         return {"ok": False, "error": str(e)}
 
