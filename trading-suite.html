@@ -12,7 +12,10 @@
   --g:#22c55e;--r:#ef4444;
 }
 *{margin:0;padding:0;box-sizing:border-box;}
-html,body{height:100%;}
+html,body{height:100%;overflow-x:clip;max-width:100%;}
+/* Kein seitliches Scrollen ins Leere: alles, was breiter als der Viewport ist
+   (Tabellen, Toolbars), scrollt NUR in seinem eigenen Container (overflow-x:auto),
+   nie die ganze Seite. clip lockt horizontal, ohne einen 2. Scroller zu erzeugen. */
 body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,sans-serif;font-size:13px;line-height:1.5;display:flex;flex-direction:column;min-height:100vh;}
 
 /* ── HEADER ── */
@@ -205,9 +208,11 @@ canvas{display:block;width:100%;}
 .lv-dropdown { position:relative; display:inline-flex; flex-shrink:0; }
 #lv-layers-btn.on { color:#fff; border-color:#555; background:#1a1a2e; }
 .lv-layers-panel {
-  /* fixed statt absolute: entkommt dem overflow-x:auto-Clipping der Toolbar.
+  /* fixed + Portal an <body> (per JS): entkommt sowohl dem overflow-Clipping der
+     Toolbar ALS AUCH jedem Stacking-Context eines Vorfahren (backdrop-filter/
+     transform). z-index über der Mobile-Nav (600), unter Toasts/Modals (9999).
      Position (top/left) wird beim Öffnen per JS gesetzt und im Viewport gehalten. */
-  position:fixed; top:60px; left:12px; z-index:500;
+  position:fixed; top:60px; left:12px; z-index:1200;
   display:none; flex-direction:column; gap:11px;
   width:min(236px, calc(100vw - 24px));
   background:#0c0c12; border:1px solid #20202c; border-radius:10px;
@@ -390,8 +395,13 @@ canvas{display:block;width:100%;}
 /* ══ MOBILE / TOUCH-OPTIMIERUNG ═══════════════════════════════ */
 @media(max-width:768px){
   /* main bleibt der Scroller, aber mit nativem Touch-Momentum (sonst ruckelig
-     auf iOS) und ohne Scroll-Chaining-Wackeln. */
-  main { -webkit-overflow-scrolling:touch; overscroll-behavior:contain; }
+     auf iOS) und ohne Scroll-Chaining-Wackeln. overflow-x:hidden → nur vertikal
+     scrollen, nie seitwärts ins Leere. */
+  main { -webkit-overflow-scrolling:touch; overscroll-behavior:contain;
+         overflow-x:hidden; }
+  /* Layer-Panel (an <body> portaliert): auf kleinen Screens nicht über den
+     unteren Rand hinaus — scrollbar statt unter der Bottom-Nav verschwinden. */
+  .lv-layers-panel{ max-height:calc(100vh - 78px); overflow-y:auto; }
 
   /* ─ Haupt-Navigation als feste Bottom-Tab-Bar: mobil-nativ, mit dem Daumen
        erreichbar, immer sichtbar. Jede Sektion ein Tipp entfernt. ─ */
@@ -7046,6 +7056,9 @@ function lvLayersToggle(btn) {
   const open = panel.classList.toggle('open');
   if (btn) btn.classList.toggle('on', open);
   if (open && btn) {
+    // Portal: Panel an <body> hängen → entkommt jedem Vorfahr-Stacking-Context
+    // (backdrop-filter/transform), sonst wird es im Hintergrund verdeckt.
+    if (panel.parentElement !== document.body) document.body.appendChild(panel);
     // Position unter dem Button, im Viewport gehalten (panel ist position:fixed)
     const r = btn.getBoundingClientRect();
     panel.style.top = (r.bottom + 7) + 'px';
@@ -7054,9 +7067,10 @@ function lvLayersToggle(btn) {
     panel.style.left = Math.max(8, left) + 'px';
   }
 }
-// Klick außerhalb schließt das Layer-Panel
+// Klick außerhalb schließt das Layer-Panel (Klick im Panel selbst hält es offen —
+// es liegt nach dem Portal nicht mehr in .lv-dropdown)
 document.addEventListener('click', e => {
-  const dd = e.target.closest && e.target.closest('.lv-dropdown');
+  const dd = e.target.closest && e.target.closest('.lv-dropdown, .lv-layers-panel');
   if (dd) return;
   const panel = document.getElementById('lv-layers-panel');
   const btn   = document.getElementById('lv-layers-btn');
