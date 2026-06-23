@@ -67,7 +67,7 @@ def run() -> dict:
     # Setup-Aggregation
     by_setup: dict[str, dict] = defaultdict(lambda: {"n": 0, "wins": 0})
     # Zeitrahmen
-    by_tf: dict[str, dict] = defaultdict(lambda: {"n": 0, "wins": 0})
+    by_tf: dict[str, dict] = defaultdict(lambda: {"n": 0, "wins": 0, "dec": 0, "exp": 0})
     # Markt-Kontext (Fear & Greed Buckets + Market Bias)
     by_market_bias: dict[str, dict] = defaultdict(lambda: {"n": 0, "wins": 0})
     by_fg_bucket:   dict[str, dict] = defaultdict(lambda: {"n": 0, "wins": 0})
@@ -143,6 +143,11 @@ def run() -> dict:
         by_setup[st]["wins"] += win
         by_tf[tf]["n"]       += w
         by_tf[tf]["wins"]    += win
+        # Roh-Zähler für die Auflösungsquote (TP/SL getroffen vs. abgelaufen)
+        if outcome == "EXPIRED":
+            by_tf[tf]["exp"] += 1
+        elif outcome in ("WIN", "LOSS"):
+            by_tf[tf]["dec"] += 1
         by_market_bias[mkt]["n"]    += w
         by_market_bias[mkt]["wins"] += win
         by_fg_bucket[fg_bkt]["n"]   += w
@@ -350,7 +355,9 @@ def run() -> dict:
         "hourly_performance":    hourly_out,
         "setup_performance":     setup_out,
         "timeframe_performance": {
-            tf: {"win_rate": round(d["wins"]/d["n"],4), "samples": d["n"]}
+            tf: {"win_rate": round(d["wins"]/d["n"],4), "samples": d["n"],
+                 "decided": d["dec"], "expired": d["exp"],
+                 "resolution_rate": round(d["dec"]/max(1, d["dec"]+d["exp"]), 4)}
             for tf, d in by_tf.items() if d["n"] > 0
         },
         "market_bias_performance": market_bias_perf,

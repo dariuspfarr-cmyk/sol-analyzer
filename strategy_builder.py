@@ -132,6 +132,21 @@ def _modifier(strength: str) -> int:
     return {"STRONG_BOOST": 20, "BOOST": 12, "STRONG_BLOCK": -25, "BLOCK": -15}[strength]
 
 
+def _combo_strength(wr: float, baseline: float) -> str | None:
+    """
+    Stärke einer (Setup×Bias)-Kombi RELATIV zur Gesamt-Win-Rate. So werden Kombis,
+    die die Baseline deutlich schlagen (z. B. 48–57% bei 27% Baseline), korrekt als
+    Gewinner geBOOSTet — auch wenn sie unter der absoluten 62%-Schwelle liegen — und
+    heben damit gezielt die Win-Rate. Katastrophale Kombis (≤10% absolut) bleiben
+    immer STRONG_BLOCK.
+    """
+    if wr <= 0.10 or wr <= baseline - 0.22: return "STRONG_BLOCK"
+    if wr <= baseline - 0.12:               return "BLOCK"
+    if wr >= baseline + 0.25:               return "STRONG_BOOST"
+    if wr >= baseline + 0.15:               return "BOOST"
+    return None
+
+
 def _confidence(n: int, max_n: int = 100) -> float:
     return round(min(0.95, 0.40 + (n / max_n) * 0.55), 3)
 
@@ -267,12 +282,13 @@ def run() -> dict:
     # Aus echten geschlossenen Signalen: die Interaktion trennt gute von schlechten
     # Kombis sauber (z. B. bullish-CHoCH 0% / bullish-BOS 3% → starkes BLOCK;
     # bearish-Kombis ohne Strafe). Hebt damit die Win-Rate gezielt.
+    baseline = report.get("gesamt", {}).get("win_rate_pct", 50) / 100
     for combo_key, d in report.get("nach_setup_bias", {}).items():
         n = d.get("closed", 0)
         if n < MIN_SAMPLES or d.get("bias") == "neutral":
             continue
         wr = d.get("win_rate_pct", 50) / 100
-        st_strength = _strength(wr)
+        st_strength = _combo_strength(wr, baseline)
         if st_strength is None:
             continue
         rid += 1

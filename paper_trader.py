@@ -162,6 +162,35 @@ def _matched_rule_signatures(row: dict, hour: int) -> list[str]:
     except Exception:
         return []
 
+
+_tf_res_cache: dict = {}
+_tf_res_mtime: float = 0.0
+
+
+def _low_resolution_tf(tf: str) -> bool:
+    """
+    True, wenn ein Timeframe gelernt überwiegend ABLÄUFT (weder TP noch SL) — also
+    kaum Edge liefert und nur Slots/Kapital bindet (z. B. 15m mit ~7% Auflösung).
+    Solche Signale werden wie demotete behandelt (müssen den Score-Floor schlagen),
+    statt im Lern-Modus gratis durchzulaufen. Selbst-korrigierend mit neuen Daten.
+    """
+    global _tf_res_cache, _tf_res_mtime
+    try:
+        import backtest_learner
+        wf = backtest_learner.WEIGHTS_FILE
+        mt = wf.stat().st_mtime
+        if mt != _tf_res_mtime:
+            import json
+            with open(wf, encoding="utf-8") as f:
+                _tf_res_cache = json.load(f).get("timeframe_performance", {})
+            _tf_res_mtime = mt
+    except Exception:
+        return False
+    d = _tf_res_cache.get(tf, {})
+    n = d.get("decided", 0) + d.get("expired", 0)
+    res = d.get("resolution_rate")
+    return res is not None and n >= 12 and res < 0.40
+
 # ── Browser-Params Cache (strategy_params.json) ───────────────────────────────
 _sp_cache: dict = {}
 _sp_mtime: float = 0.0
@@ -1075,6 +1104,14 @@ def _score_signal(row: dict, market_bias: str, hourly_perf: dict,
         if tf_data.get("samples", 0) >= 8:
             tf_wr_delta = (float(tf_data["win_rate"]) - 0.5) * 20.0  # max ±10 Punkte
             composite += round(tf_wr_delta, 1)
+        # Effizienz-Strafe: Timeframes, die meist ABLAUFEN (weder TP noch SL), liefern
+        # keinen Edge und blockieren nur Slots/Kapital. Niedrige Auflösungsquote →
+        # abwerten (z. B. 15m mit ~7% Auflösung). Selbst-korrigierend, sobald ein TF
+        # mit echten Daten wieder häufiger auflöst.
+        _res   = tf_data.get("resolution_rate")
+        _n_res = tf_data.get("decided", 0) + tf_data.get("expired", 0)
+        if _res is not None and _n_res >= 12 and _res < 0.40:
+            composite -= round((0.40 - _res) * 40.0, 1)   # bis ~-16 Punkte bei 0% Auflösung
     except Exception:
         pass
 
@@ -1312,7 +1349,8 @@ def _get_db_signal(state: Optional["State"] = None, return_all: bool = False):
         # BOS pauschal zu blocken, und tradet nie allein auf Basis eines schwachen Setups.
         try:
             _hour = datetime.now(timezone.utc).hour
-            row["_is_demoted"] = any("|BLOCK|" in s for s in _matched_rule_signatures(row, _hour))
+            row["_is_demoted"] = (any("|BLOCK|" in s for s in _matched_rule_signatures(row, _hour))
+                                  or _low_resolution_tf(tf))
         except Exception:
             row["_is_demoted"] = False
 
@@ -1499,7 +1537,8 @@ def evaluate_autoki(direction: str, entry: float, sl: float, tp: float,
            "source": "LIVE", "volume_ratio": 1.0}
     _hour = datetime.now(timezone.utc).hour
     try:
-        is_demoted = any("|BLOCK|" in s for s in _matched_rule_signatures(row, _hour))
+        is_demoted = (any("|BLOCK|" in s for s in _matched_rule_signatures(row, _hour))
+                      or _low_resolution_tf(timeframe))
     except Exception:
         is_demoted = False
 
