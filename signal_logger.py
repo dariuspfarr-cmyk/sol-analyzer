@@ -636,6 +636,29 @@ def log_autoki_signal(
     return sig_id
 
 
+def recent_autoki_id(timeframe: str, setup_type: str, bias: str,
+                     within_min: float) -> int | None:
+    """
+    ID eines kürzlich (innerhalb within_min Minuten) erzeugten, noch OFFENEN
+    Auto-KI-Signals mit gleicher (timeframe, setup_type, bias) — oder None.
+
+    Dient der Dedup mehrerer Signal-Quellen: der Headless-Kiosk UND ein offener
+    Nutzer-Browser senden sonst dasselbe Signal doppelt. So entsteht pro
+    Kerzenperiode nur EIN Eintrag/Trade je (TF, Setup, Richtung).
+    """
+    from datetime import datetime, timezone, timedelta
+    cutoff = (datetime.now(timezone.utc) - timedelta(minutes=within_min)).isoformat()
+    conn = _conn()
+    row = conn.execute(
+        """SELECT id FROM signals
+           WHERE routing = 'autoki' AND timeframe = ? AND setup_type = ?
+             AND bias = ? AND timestamp >= ? AND outcome IS NULL
+           ORDER BY id DESC LIMIT 1""",
+        (timeframe, setup_type, bias, cutoff),
+    ).fetchone()
+    return row[0] if row else None
+
+
 def get_tradeable_signals(max_age_hours: float = 8.0) -> list[dict]:
     """
     Gibt alle frischen, ungehandelten Signale zurück, die für den Paper Trader

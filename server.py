@@ -199,6 +199,21 @@ def api_submit_signal(body: dict) -> dict:
                     "entry_planned": verdict.get("entry_planned"),
                     "entry_fill":    verdict.get("entry_fill")}
 
+        # Dedup mehrerer Quellen (Headless-Kiosk + offener Nutzer-Browser): dasselbe
+        # Setup auf demselben Timeframe innerhalb einer Kerzenperiode nur EINMAL
+        # speichern/traden. Verhindert doppelte Signal-Einträge in signals.db.
+        _TF_MIN = {"15m": 15, "30m": 30, "1h": 60, "4h": 240, "1d": 1440}
+        _win    = _TF_MIN.get(timeframe, 240)
+        dup_id  = signal_logger.recent_autoki_id(
+            timeframe, verdict.get("setup_type"), verdict.get("bias"), _win)
+        if dup_id:
+            return {"ok": True, "tradeable": True, "duplicate": True,
+                    "signal_id":     dup_id,
+                    "entry_planned": verdict.get("entry_planned"),
+                    "entry_fill":    verdict.get("entry_fill"),
+                    "rr_fill":       verdict.get("rr_fill"),
+                    "reason":        "bereits erfasst (Duplikat-Quelle)"}
+
         sig_id = signal_logger.log_autoki_signal(
             direction=direction, entry=entry, sl=sl, tp=tp, rsi=rsi,
             label=label, conf=conf, timeframe=timeframe,

@@ -1580,7 +1580,8 @@ def evaluate_autoki(direction: str, entry: float, sl: float, tp: float,
             pass
 
     return {"tradeable": True, "entry_planned": round(entry, 4),
-            "entry_fill": fill, "rr_fill": rr_fill, "reason": "handelbar"}
+            "entry_fill": fill, "rr_fill": rr_fill, "reason": "handelbar",
+            "setup_type": setup_type, "bias": bias}
 
 
 # ── Trade-Ausführung ──────────────────────────────────────────────────────────

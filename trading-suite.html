@@ -7701,6 +7701,12 @@ const _origJnRefresh = typeof jnRefresh === 'function' ? jnRefresh : null;
 // INIT
 // ══════════════════════════════════════════════════════════════════
 (function init(){
+  // Headless-Kiosk Multi-TF: Timeframe pro Tab via ?tf=15m|1h|4h|1d setzen, damit
+  // mehrere Kiosk-Tabs gleichzeitig alle Timeframes 24/7 scannen.
+  try {
+    const _tf = new URLSearchParams(location.search).get('tf');
+    if (_tf && ['15m','1h','4h','1d'].includes(_tf)) lvInterval_ = _tf;
+  } catch (e) {}
   showSec('strategy');
   // Auto-KI 24/7: Live-Engine sofort im Hintergrund starten — Kerzen-Stream und
   // Auto-KI laufen dauerhaft, ohne dass erst auf "Live" geklickt werden muss.
