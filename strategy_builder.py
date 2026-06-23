@@ -213,20 +213,25 @@ def run() -> dict:
             continue
 
         is_boost = "BOOST" in st
-        rid += 1
-        if is_boost:
-            preferred_setups.append(st_name)
-            min_rr_by_setup[st_name] = round(max(1.5, avg_rr * 0.7), 1)
-        else:
+        if not is_boost:
+            # KEINE pauschale Setup-BLOCK-Regel mehr: "schlechtes Setup" ist fast
+            # immer nur in EINEM Bias schlecht (Interaktion). Eine pauschale Sperre
+            # bestrafte sonst auch die GUTEN Kombis mit (echte Daten: bearish-BOS
+            # 50% WR vs. bullish-BOS 3% WR). Die (Setup×Bias)-Kombi-Regeln unten
+            # fangen die schlechten Kombis präzise ab.
             avoided_setups.append(st_name)
+            continue
 
+        rid += 1
+        preferred_setups.append(st_name)
+        min_rr_by_setup[st_name] = round(max(1.5, avg_rr * 0.7), 1)
         rules.append({
             "id":       f"setup_{rid:03d}",
             "type":     "SETUP_PERFORMANCE",
-            "action":   "BOOST" if is_boost else "BLOCK",
+            "action":   "BOOST",
             "strength": st,
             "conditions": {"setup_type": st_name},
-            "score_modifier": 10 if st == "STRONG_BOOST" else 5 if st == "BOOST" else -18 if st == "STRONG_BLOCK" else -9,
+            "score_modifier": 10 if st == "STRONG_BOOST" else 5,
             "min_rr":    min_rr_by_setup.get(st_name),
             "win_rate":  round(wr, 3),
             "samples":   n,
@@ -256,6 +261,34 @@ def run() -> dict:
             "samples":   n,
             "confidence": _confidence(n, 50),
             "evidence":  f"Bias {bias_name}: {wr*100:.1f}% WR N={n}",
+        })
+
+    # ── 3b. Setup × Bias-Kombi-Regeln (stärkster datenbasierter Prädiktor) ────
+    # Aus echten geschlossenen Signalen: die Interaktion trennt gute von schlechten
+    # Kombis sauber (z. B. bullish-CHoCH 0% / bullish-BOS 3% → starkes BLOCK;
+    # bearish-Kombis ohne Strafe). Hebt damit die Win-Rate gezielt.
+    for combo_key, d in report.get("nach_setup_bias", {}).items():
+        n = d.get("closed", 0)
+        if n < MIN_SAMPLES or d.get("bias") == "neutral":
+            continue
+        wr = d.get("win_rate_pct", 50) / 100
+        st_strength = _strength(wr)
+        if st_strength is None:
+            continue
+        rid += 1
+        is_boost = "BOOST" in st_strength
+        rules.append({
+            "id":       f"combo_{rid:03d}",
+            "type":     "SETUP_BIAS_PERFORMANCE",
+            "action":   "BOOST" if is_boost else "BLOCK",
+            "strength": st_strength,
+            "conditions": {"setup_type": d["setup_type"], "bias": d["bias"]},
+            "score_modifier": _modifier(st_strength),
+            "min_rr":    None,
+            "win_rate":  round(wr, 3),
+            "samples":   n,
+            "confidence": _confidence(n, 50),
+            "evidence":  f"{d['setup_type']} {d['bias']}: {wr*100:.1f}% WR N={n}",
         })
 
     # ── 4. Live-Erfahrungs-Regeln (Paper-Trade-Ergebnisse) ────────────────────

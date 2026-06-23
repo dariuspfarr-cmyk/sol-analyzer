@@ -216,6 +216,25 @@ def run() -> dict[str, Any]:
             "avg_pnl_pct":  _avg_pnl([s for s in grp if s.get("outcome") in ("WIN","LOSS")]),
         }
 
+    # ── 4b. Pro Setup × Bias (Interaktion — stärkster Win-Rate-Prädiktor) ─────
+    # Marginale Setup-/Bias-Raten sind verwechselt (z. B. "BOS schlecht" ist in
+    # Wahrheit "bullish-BOS schlecht, bearish-BOS gut"). Die Interaktion trennt das.
+    by_setup_bias: dict[str, dict] = {}
+    combo_groups: dict[tuple, list] = defaultdict(list)
+    for s in signals:
+        combo_groups[(s.get("setup_type", "?"), s.get("bias", "?"))].append(s)
+    for (st, bias), grp in combo_groups.items():
+        cl = [s for s in grp if s.get("outcome") in ("WIN", "LOSS")]
+        by_setup_bias[f"{st}|{bias}"] = {
+            "setup_type":   st,
+            "bias":         bias,
+            "count":        len(grp),
+            "closed":       len(cl),
+            "win_rate_pct": _win_rate(grp),
+            "avg_pnl_pct":  _avg_pnl(cl),
+            "avg_rr":       _avg_rr(grp),
+        }
+
     # ── 5. Volumen-Filter-Analyse ─────────────────────────────────────────────
     vol_triggered = [s for s in signals if "Volume" in (s.get("all_triggers") or "")]
     vol_win_rate  = _win_rate(vol_triggered) if vol_triggered else None
@@ -230,6 +249,7 @@ def run() -> dict[str, Any]:
         "nach_setup_typ": by_setup,
         "nach_timeframe": by_tf,
         "nach_bias":      by_bias,
+        "nach_setup_bias": by_setup_bias,
         "volumen_filter": {
             "signale_mit_volume_spike": len(vol_triggered),
             "win_rate_pct": vol_win_rate,
