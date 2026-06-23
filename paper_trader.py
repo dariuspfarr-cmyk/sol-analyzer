@@ -1524,38 +1524,72 @@ def evaluate_autoki(direction: str, entry: float, sl: float, tp: float,
         if len(state.positions) >= pos_cap:
             return _no("Positions-Limit erreicht")
 
-    # Live-Preis + Entry-Zonen-Trigger: Preis muss JETZT realistisch triggern
+    # Live-Preis holen
     price = _fetch_price()
     if not price or price <= 0:
         return _no("kein Live-Preis verfügbar")
+
+    # GELERNTER ENTRY: der Bot legt den Entry auf das Pullback-Level, zu dem der
+    # Markt erfahrungsgemäß zurückkehrt (hohe Füllquote) — statt am Markt zu chasen.
+    # Kaltstart/zu wenig Daten → entry_eff == Trigger, Verhalten exakt wie bisher.
+    import entry_optimizer
+    sugg      = entry_optimizer.suggest_entry(entry, sl, direction, setup_type, timeframe)
+    entry_eff = sugg["entry"]
+    learned   = sugg["source"] == "learned"
+    sl_dist_e = abs(entry_eff - sl)
+    if sl_dist_e < 1e-6:
+        return _no("SL-Distanz (Entry) zu klein")
+
     sp = _load_strategy_params()
     zone_frac  = max(0.10, min(0.60, float(sp.get("entry_zone_frac",  ENTRY_ZONE_FRAC))))
     chase_frac = max(0.02, min(0.40, float(sp.get("entry_chase_frac", ENTRY_CHASE_FRAC))))
-    if bias == "bullish":
-        if price <= sl:                          return _no("Preis unter SL — Setup ungültig")
-        if price >= tp:                          return _no("Ziel bereits erreicht")
-        if price > entry + sl_dist * chase_frac: return _no("Preis weggelaufen — kein Nachjagen")
-        if price < entry - sl_dist * zone_frac:  return _no("Preis zu weit unter der Zone")
-    else:
-        if price >= sl:                          return _no("Preis über SL — Setup ungültig")
-        if price <= tp:                          return _no("Ziel bereits erreicht")
-        if price < entry - sl_dist * chase_frac: return _no("Preis weggelaufen — kein Nachjagen")
-        if price > entry + sl_dist * zone_frac:  return _no("Preis zu weit über der Zone")
+    MAX_WAIT_FRAC = 0.75   # wie weit über dem Pullback-Entry der Preis noch "wartend" sein darf
 
-    # Realer Fill = Markt + Slippage (identisch zu _open_trade_from_signal)
-    slip = price * SLIPPAGE_PCT / 100.0
-    fill = price + slip if direction == "long" else price - slip
-    fill = round(fill, PRICE_DECIMALS)
-    if direction == "long":
-        if fill <= sl or fill >= tp:             return _no("Fill bereits jenseits SL/TP")
+    pending = False
+    if bias == "bullish":
+        if price <= sl:    return _no("Preis unter SL — Setup ungültig")
+        if price >= tp:    return _no("Ziel bereits erreicht")
+        if price > entry_eff + sl_dist_e * chase_frac:
+            # Preis über dem Entry: bei gelerntem Pullback ERWARTET → Limit wartet auf
+            # Rückkehr ("Order abholen"). Ohne Lernung = Chasing → ablehnen.
+            if learned and price <= entry_eff + sl_dist_e * MAX_WAIT_FRAC:
+                pending = True
+            else:
+                return _no("Preis weggelaufen — kein Nachjagen")
+        elif price < entry_eff - sl_dist_e * zone_frac:
+            return _no("Preis zu weit unter der Zone")
     else:
-        if fill >= sl or fill <= tp:             return _no("Fill bereits jenseits SL/TP")
-    fill_dist = abs(fill - sl)
-    if fill_dist < 1e-6:
-        return _no("Fill-SL-Distanz zu klein")
-    rr_fill = round(abs(tp - fill) / fill_dist, 2)
-    if rr_fill < MIN_RR:
-        return _no(f"reales R:R {rr_fill:.2f} < {MIN_RR} nach Live-Fill")
+        if price >= sl:    return _no("Preis über SL — Setup ungültig")
+        if price <= tp:    return _no("Ziel bereits erreicht")
+        if price < entry_eff - sl_dist_e * chase_frac:
+            if learned and price >= entry_eff - sl_dist_e * MAX_WAIT_FRAC:
+                pending = True
+            else:
+                return _no("Preis weggelaufen — kein Nachjagen")
+        elif price > entry_eff + sl_dist_e * zone_frac:
+            return _no("Preis zu weit über der Zone")
+
+    if pending:
+        # Limit-Order wartet auf den Pullback zum gelernten Entry — kein Sofort-Fill.
+        # Der Paper Trader füllt sie, sobald der Markt das Level erreicht (über
+        # _get_db_signal/Entry-Zone), innerhalb der Signal-Lebensdauer.
+        rr_fill = round(abs(tp - entry_eff) / sl_dist_e, 2)
+        if rr_fill < MIN_RR:
+            return _no(f"R:R {rr_fill:.2f} < {MIN_RR} am Pullback-Entry")
+        fill = None
+    else:
+        # Sofort-Fill am Markt + Slippage (identisch zu _open_trade_from_signal)
+        slip = price * SLIPPAGE_PCT / 100.0
+        fill = round(price + slip if direction == "long" else price - slip, PRICE_DECIMALS)
+        if direction == "long":
+            if fill <= sl or fill >= tp:  return _no("Fill bereits jenseits SL/TP")
+        else:
+            if fill >= sl or fill <= tp:  return _no("Fill bereits jenseits SL/TP")
+        fill_dist = abs(fill - sl)
+        if fill_dist < 1e-6:              return _no("Fill-SL-Distanz zu klein")
+        rr_fill = round(abs(tp - fill) / fill_dist, 2)
+        if rr_fill < MIN_RR:
+            return _no(f"reales R:R {rr_fill:.2f} < {MIN_RR} nach Live-Fill")
 
     # News-Block: kein neuer Trade innerhalb ±2h eines High-Impact Events
     try:
@@ -1579,8 +1613,11 @@ def evaluate_autoki(direction: str, entry: float, sl: float, tp: float,
         except Exception:
             pass
 
-    return {"tradeable": True, "entry_planned": round(entry, 4),
-            "entry_fill": fill, "rr_fill": rr_fill, "reason": "handelbar",
+    return {"tradeable": True, "entry_planned": round(entry_eff, 4),
+            "entry_fill": fill, "rr_fill": rr_fill,
+            "reason": ("wartet auf Pullback" if pending else "handelbar"),
+            "pending": pending, "source": sugg["source"],
+            "pullback_frac": sugg["pullback_frac"], "fill_rate": sugg["fill_rate"],
             "setup_type": setup_type, "bias": bias}
 
 

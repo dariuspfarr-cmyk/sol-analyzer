@@ -150,6 +150,17 @@ def run(force: bool = False) -> dict:
     except Exception as e:
         entry["actions"].append(f"Performance-Analyse: Fehler ({e})")
 
+    # ── 2b. Entry-Platzierung lernen (Pullback-Tiefe + Füllquote je Kontext) ──
+    try:
+        import entry_optimizer
+        em = entry_optimizer.update()
+        n_ctx = len(em.get("contexts", {}))
+        entry["actions"].append(
+            f"Entry-Optimizer: {n_ctx} Kontext(e) mit gelerntem Pullback"
+            if n_ctx else "Entry-Optimizer: noch zu wenig MAE-Daten")
+    except Exception as e:
+        entry["actions"].append(f"Entry-Optimizer: Fehler ({e})")
+
     # ── 3. Thresholds optimieren (mit Backup + Auto-Rollback) ────────────────
     backed_up = _backup_config()
     try:

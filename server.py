@@ -214,8 +214,11 @@ def api_submit_signal(body: dict) -> dict:
                     "rr_fill":       verdict.get("rr_fill"),
                     "reason":        "bereits erfasst (Duplikat-Quelle)"}
 
+        # Auf dem GELERNTEN Entry-Level loggen (Pullback-Limit), nicht am Trigger —
+        # so wartet die Order auf die Rückkehr des Marktes und füllt am besseren Preis.
+        entry_eff = verdict.get("entry_planned", entry)
         sig_id = signal_logger.log_autoki_signal(
-            direction=direction, entry=entry, sl=sl, tp=tp, rsi=rsi,
+            direction=direction, entry=entry_eff, sl=sl, tp=tp, rsi=rsi,
             label=label, conf=conf, timeframe=timeframe,
         )
         _sse_broadcast("new_signal", {"signal_id": sig_id, "source": "AUTO_KI"})
@@ -223,6 +226,10 @@ def api_submit_signal(body: dict) -> dict:
                 "entry_planned": verdict.get("entry_planned"),
                 "entry_fill":    verdict.get("entry_fill"),
                 "rr_fill":       verdict.get("rr_fill"),
+                "pending":       verdict.get("pending", False),
+                "source":        verdict.get("source"),
+                "pullback_frac": verdict.get("pullback_frac"),
+                "fill_rate":     verdict.get("fill_rate"),
                 "reason":        verdict.get("reason")}
     except Exception as e:
         return {"ok": False, "error": str(e)}

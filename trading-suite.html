@@ -6832,9 +6832,13 @@ class AutoSignalEngine {
     const qCol=qs>=75?'#4ade80':qs>=62?'#fbbf24':'#a78bfa';
     const qTag=qs!=null?`<span style="font-size:9px;color:${qCol};font-weight:700"> · Q${qs}</span>`:'';
     const planned=(res.entry_planned!=null?res.entry_planned:(sig.entryPrice||candle.c));
-    const fill=(res.entry_fill!=null?res.entry_fill:planned);
+    const pending=!!res.pending;
+    const fillV=(res.entry_fill!=null?res.entry_fill:planned);
     const rr=(res.rr_fill!=null?res.rr_fill:null);
+    const learned=res.source==='learned';
     const typeTag=`<span style="font-size:9px;background:${col}20;color:${col};padding:1px 5px;border-radius:2px;margin-left:4px">${sig.label||'BOUNCE'}</span>`;
+    // Gelernter-Pullback-Hinweis (Füllwahrscheinlichkeit)
+    const learnTag=learned?`<div style="font-size:9px;color:#7b61ff;margin-top:2px">◈ gelernter Pullback ${Math.round((res.pullback_frac||0)*100)}%·SL · Füllquote ${Math.round((res.fill_rate||0)*100)}%</div>`:'';
     const card=document.createElement('div');
     card.className=`lv-sig-card ${sig.direction}`;
     card.innerHTML=`
@@ -6844,16 +6848,17 @@ class AutoSignalEngine {
       </div>
       <div style="font-size:11px;color:var(--muted);margin-top:3px">RSI ${sig.rsi.toFixed(1)}${conf?' · '+conf:''}${qTag}</div>
       <div style="display:grid;grid-template-columns:auto auto;gap:1px 8px;font-size:10px;margin-top:4px">
-        <span style="color:var(--muted)">Entry (geplant)</span><span style="color:#fff;text-align:right">$${planned.toFixed(2)}</span>
-        <span style="color:var(--muted)">Order-Fill (PT)</span><span style="color:${col};font-weight:700;text-align:right">$${fill.toFixed(2)}</span>
+        <span style="color:var(--muted)">Entry (Limit)</span><span style="color:#fff;text-align:right">$${planned.toFixed(2)}</span>
+        <span style="color:var(--muted)">Order-Fill (PT)</span><span style="color:${col};font-weight:700;text-align:right">${pending?'⏳ wartet':'$'+fillV.toFixed(2)}</span>
         ${rr!=null?`<span style="color:var(--muted)">R:R</span><span style="color:var(--dim);text-align:right">1:${rr}</span>`:''}
       </div>
-      <div style="font-size:9px;color:#089981;margin-top:3px">✓ #${res.signal_id} — Paper Trader tradet @ $${fill.toFixed(2)}</div>`;
+      ${learnTag}
+      <div style="font-size:9px;color:${pending?'#fbbf24':'#089981'};margin-top:3px">${pending?`⏳ #${res.signal_id} — Limit @ $${planned.toFixed(2)}, wartet auf Pullback`:`✓ #${res.signal_id} — Paper Trader tradet @ $${fillV.toFixed(2)}`}</div>`;
     const log=document.getElementById('lv-sigLog');
     if (log) { log.insertBefore(card,log.firstChild); if(log.children.length>20) log.lastChild?.remove(); }
     const cnt=document.getElementById('lv-sigCount');
     if (cnt) cnt.textContent=(log?.children.length||0)+'';
-    this.signals.push({...sig, price:candle.c, entryPrice:planned, entryFill:fill, time:Date.now()});
+    this.signals.push({...sig, price:candle.c, entryPrice:planned, entryFill:fillV, time:Date.now()});
   }
 
   _showAlert(sig, candle, res) {
