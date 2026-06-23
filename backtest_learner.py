@@ -137,8 +137,10 @@ def run() -> dict:
         p["zone_position"] = zone
         p["hour_bucket"]   = hb
 
-        hourly[hour]["n"]    += w
-        hourly[hour]["wins"] += win
+        # Nach 3h-Bucket aggregieren (robustere Stichproben; deckt sich mit der
+        # Bucket-Suche in _score_signal — vorher per Einzelstunde = Mismatch/Bug).
+        hourly[hb]["n"]    += w
+        hourly[hb]["wins"] += win
         by_setup[st]["n"]    += w
         by_setup[st]["wins"] += win
         by_tf[tf]["n"]       += w

@@ -853,15 +853,20 @@ def _score_signal(row: dict, market_bias: str, hourly_perf: dict,
             else:
                 composite -= 15.0  # Kontra-Trend-Strafe (Default)
 
-    # Tagesstunden-Faktor (aus backtest_weights.json hourly_performance)
+    # Tagesstunden-Faktor (aus backtest_weights.json hourly_performance, 3h-Bucket).
+    # Baseline-relativ + selbst-kalibrierend: vergleicht die Stunde mit dem Schnitt
+    # ALLER Stunden-Buckets. Echte Daten zeigen einen starken Effekt (00-02h ~56% vs
+    # 18-20h ~8% WR), der vorher durch Bucket-Key-Mismatch + absolute Schwellen
+    # (–20 schon unter 35%) verzerrt war.
     hb = str((hour // 3) * 3)
     hp = hourly_perf.get(hb, {})
-    if hp.get("samples", 0) >= 5:
-        hr_wr = float(hp.get("win_rate", 0.5))
-        if hr_wr < 0.35:
-            composite -= 20.0   # statistisch schlechte Stunde
-        elif hr_wr > 0.65:
-            composite += 8.0    # statistisch gute Stunde
+    if hp.get("samples", 0) >= 8:
+        hr_wr  = float(hp.get("win_rate", 0.5))
+        _hrs   = [float(v.get("win_rate", 0.0)) for v in hourly_perf.values()
+                  if v.get("samples", 0) >= 8]
+        _base  = sum(_hrs) / len(_hrs) if _hrs else 0.3
+        # Abweichung von der Stunden-Baseline → bis +14 (gute Stunde) / –22 (schlechte)
+        composite += round(max(-22.0, min(14.0, (hr_wr - _base) * 60.0)), 1)
 
     # 1D-Trend Confluence (+8 Agree / -12 Contra)
     daily_trend  = _get_daily_trend()
