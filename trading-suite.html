@@ -1798,7 +1798,13 @@ function showSec(sec) {
     `<button class="snav on" id="snb-${t.id}" onclick="showSub('${sec}','${t.id}')">${t.label}</button>`
   ).join('');
   if (tabs.length) showSub(sec, tabs[0].id);
-  if (sec === 'live') { setTimeout(lvInit, 60); setTimeout(ptRefresh, 500); }
+  if (sec === 'live') {
+    setTimeout(lvInit, 60);
+    setTimeout(() => { if (lvChart) lvChart.setVisible(true); }, 80);
+    setTimeout(ptRefresh, 500);
+  } else if (lvChart) {
+    lvChart.setVisible(false);   // Rendern pausieren; Kerzen-Stream & Auto-KI laufen weiter
+  }
   if (sec === 'bot')  botInit();
 }
 
@@ -6910,6 +6916,9 @@ function lvInit() {
   if (lvChart) { setTimeout(()=>lvChart._resize(),50); return; }
   if (!document.getElementById('lv-canvas')) return; // section not yet in DOM
   lvChart = new LiveChart('lv-canvas','lv-wrap');
+  // Im Hintergrund (nicht auf dem Live-Tab) das Rendering pausieren — der
+  // Kerzen-Stream und die Auto-KI laufen unabhängig davon weiter (24/7).
+  if (curSec !== 'live') lvChart.setVisible(false);
 
   // Animations-Loop während des Seiten-Scrollens pausieren → flüssiges,
   // ruckelfreies Scrollen (der Canvas rendert sonst 60fps gegen den Scroll).
@@ -7693,6 +7702,11 @@ const _origJnRefresh = typeof jnRefresh === 'function' ? jnRefresh : null;
 // ══════════════════════════════════════════════════════════════════
 (function init(){
   showSec('strategy');
+  // Auto-KI 24/7: Live-Engine sofort im Hintergrund starten — Kerzen-Stream und
+  // Auto-KI laufen dauerhaft, ohne dass erst auf "Live" geklickt werden muss.
+  // Solange das Dashboard geöffnet ist, wird jede neue Kerze analysiert und
+  // handelbare Signale gehen automatisch an den Paper Trader.
+  setTimeout(() => { try { lvInit(); } catch (e) { console.warn('[AutoKI] Hintergrund-Start:', e); } }, 600);
   // Restore journal trades
   const raw=localStorage.getItem('bj_trades');
   if(raw){try{const parsed=JSON.parse(raw);jnTrades=parsed.map(t=>({...t,closeTime:t.closeTime?new Date(t.closeTime):null,openTime:t.openTime?new Date(t.openTime):null}));jnRefresh();setStatus('ok',`${jnTrades.length} Trades aus lokalem Speicher`);}catch(e){localStorage.removeItem('bj_trades');}}
