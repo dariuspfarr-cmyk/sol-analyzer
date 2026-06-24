@@ -1422,12 +1422,16 @@ def _get_db_signal(state: Optional["State"] = None, return_all: bool = False):
 
         score = _score_signal(row, market_bias, hourly_perf, weights, sig_map)
         floor = _dynamic_score_floor(state) if state else MIN_SCORE_FLOOR
-        # Demotete Setups (gelernte Verlierer) müssen den Floor IMMER schlagen — auch
-        # im Lern-Modus. Nur wenn der Gesamt-Kontext (Regime/Stunde/MTF/Volumen/
-        # Confluence) sie über die Schwelle hebt, werden sie getradet ("nicht allein
-        # auf Basis des Setups"). Nicht-demotete Signale behalten den Lern-Modus-Freipass.
-        if score < floor and (not return_all or row.get("_is_demoted")):
-            continue   # Adaptiver Floor: schwache Signale bei schlechter Performance ignorieren
+        # Demotete Setups: nicht hart blocken, sondern nach einer Möglichkeit suchen.
+        # Sie dürfen handeln, wenn der Kontext den Score über den Floor hebt ODER ein
+        # starkes R:R (≥2.5) vorliegt — ein gutes Chance-Risiko-Verhältnis macht selbst
+        # ein schwaches Setup positiv-erwartet (Verbesserung statt Sperre). Nur wenn
+        # WEDER Score NOCH R:R tragen, wird übersprungen. Nicht-demotete behalten den
+        # Lern-Modus-Freipass.
+        _GOOD_RR = 2.5
+        if score < floor and (not return_all
+                              or (row.get("_is_demoted") and rr < _GOOD_RR)):
+            continue
         row["_composite_score"] = round(score, 2)
         row["_live_price"]      = current_price
         seen_combos.add(combo)   # Kombi gewählt → keine weitere identische in diesem Lauf
@@ -1642,20 +1646,37 @@ def evaluate_autoki(direction: str, entry: float, sl: float, tp: float,
     except Exception:
         pass
 
-    # Demote-Floor: ein schwach gelerntes Setup (BLOCK-Regel) wird nur getradet,
-    # wenn der Gesamt-Kontext (Regime/Stunde/MTF/Volumen) den Composite-Score über
-    # den Floor hebt — sonst nicht "auf eigener Basis" traden. Der Bot lernt damit,
-    # WANN z. B. ein BOS hilft, statt BOS pauschal zu blocken.
+    # Schwaches Setup? NICHT blocken — eine MÖGLICHKEIT suchen, es tragfähig zu machen.
+    # Reicht der Kontext-Score nicht, legt der Bot den Entry auf ein TIEFERES Pullback-
+    # Level (besserer Preis → besseres R:R) und wartet als Limit auf die Rückkehr des
+    # Marktes. Füllt nur am besseren Preis → WR-sicher (unausgeführt = kein Verlust),
+    # nie dauerhaft gesperrt. So sucht der Bot aktiv nach Verbesserung statt zu blocken.
     if is_demoted:
         try:
             mb, hp, wts, smap = _scoring_context()
             score = _score_signal(row, mb, hp, wts, smap)
             floor = _dynamic_score_floor(state) if state else MIN_SCORE_FLOOR
-            if score < floor:
-                return _no(f"schwaches Setup — Kontext bestätigt nicht "
-                           f"(Score {score:.0f} < Floor {floor:.0f})")
         except Exception:
-            pass
+            score, floor = 100.0, 0.0
+        if score < floor:
+            IMPROVE = 0.35   # 35% der SL-Distanz tiefer einsteigen → besseres R:R
+            imp_entry = (entry - IMPROVE * sl_dist) if direction == "long" \
+                        else (entry + IMPROVE * sl_dist)
+            imp_entry = round(imp_entry, PRICE_DECIMALS)
+            imp_dist  = abs(imp_entry - sl)
+            imp_rr    = round(abs(tp - imp_entry) / imp_dist, 2) if imp_dist > 1e-6 else 0.0
+            # Nur wenn der verbesserte Entry zwischen aktuellem Preis und SL liegt
+            # (Markt muss realistisch dorthin zurückkehren können) und das R:R trägt.
+            _toward_sl = (imp_entry < price) if direction == "long" else (imp_entry > price)
+            if imp_rr >= MIN_RR and _toward_sl:
+                return {"tradeable": True, "entry_planned": imp_entry,
+                        "entry_fill": None, "rr_fill": imp_rr, "pending": True,
+                        "source": "improved",
+                        "reason": "Verbesserung gesucht: tieferer Pullback-Entry",
+                        "pullback_frac": IMPROVE, "fill_rate": None,
+                        "setup_type": setup_type, "bias": bias}
+            return _no(f"keine tragfähige Verbesserung gefunden "
+                       f"(R:R {imp_rr} < {MIN_RR}) — warte auf besseren Kontext")
 
     return {"tradeable": True, "entry_planned": round(entry_eff, 4),
             "entry_fill": fill, "rr_fill": rr_fill,
