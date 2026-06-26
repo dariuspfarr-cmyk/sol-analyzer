@@ -485,6 +485,16 @@ def api_strategy_rules() -> dict:
         return {"error": str(e)}
 
 
+def api_health() -> dict:
+    """Konsolidierter Bot-Gesundheits-Snapshot (WR-Trend, bevorzugt/gemieden,
+    Timeframe-Effizienz, Regime, Modell) — für das Health-Panel im Dashboard."""
+    try:
+        import observability
+        return observability.snapshot()
+    except Exception as e:
+        return {"error": str(e)}
+
+
 def api_strategy_ranking() -> dict:
     """Bewertung aller Strategie-Profile (auto-Selektor) + aktives Profil."""
     import json as _j
@@ -735,6 +745,8 @@ class Handler(SimpleHTTPRequestHandler):
             self._send_json(api_strategy_rules())
         elif path == "/api/strategy-ranking":
             self._send_json(api_strategy_ranking())
+        elif path == "/api/health":
+            self._send_json(api_health())
         elif path == "/api/strategy-activate" and self.command == "POST":
             length = int(self.headers.get("Content-Length", 0))
             body   = self.rfile.read(length) if length else b"{}"

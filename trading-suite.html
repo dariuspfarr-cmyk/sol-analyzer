@@ -939,8 +939,16 @@ canvas{display:block;width:100%;}
       </div>
 
       <!-- Pane: Bot / Evolution Log -->
-      <div class="lv-pane" id="lv-pane-bot" style="flex-direction:column;overflow:hidden">
-        <div style="padding:8px 14px 4px;border-bottom:1px solid #14141c;flex-shrink:0;display:flex;justify-content:space-between;align-items:center">
+      <div class="lv-pane" id="lv-pane-bot" style="flex-direction:column;overflow-y:auto">
+        <!-- ── Bot-Gesundheit: konsolidierter Lern-/Performance-Überblick ── -->
+        <div style="padding:8px 14px 4px;flex-shrink:0;display:flex;justify-content:space-between;align-items:center">
+          <span style="font-size:9px;color:#666;text-transform:uppercase;letter-spacing:.6px;font-weight:700">◈ Bot-Gesundheit</span>
+          <button class="btn bg bsm" onclick="lvLoadHealth()" style="font-size:9px;padding:2px 8px">↺</button>
+        </div>
+        <div id="lv-health" style="padding:2px 12px 10px;flex-shrink:0">
+          <div style="color:#444;font-size:11px;padding:10px 2px">Lade Gesundheits-Daten…</div>
+        </div>
+        <div style="padding:8px 14px 4px;border-top:1px solid #14141c;border-bottom:1px solid #14141c;flex-shrink:0;display:flex;justify-content:space-between;align-items:center">
           <span style="font-size:9px;color:#444;text-transform:uppercase;letter-spacing:.5px">Tägliche Performance</span>
           <button class="btn bg bsm" onclick="evoLogRefresh()" style="font-size:9px;padding:2px 8px">↺</button>
         </div>
@@ -8380,7 +8388,65 @@ function lvTab(id, btn) {
   document.getElementById('lv-pane-' + id).classList.add('on');
   if (id === 'paper') ptRefresh();
   if (id === 'log')   lvLogRefresh();
-  if (id === 'bot')   evoLogRefresh();
+  if (id === 'bot')   { lvLoadHealth(); evoLogRefresh(); }
+}
+
+// ── Bot-Gesundheit: konsolidierter Lern-/Performance-Snapshot ──────────
+async function lvLoadHealth() {
+  const el = document.getElementById('lv-health');
+  if (!el) return;
+  try {
+    const d = await fetch('/api/health').then(r => r.json());
+    if (d.error) { el.innerHTML = `<div style="color:#f23645;font-size:11px">Fehler: ${d.error}</div>`; return; }
+    const s = d.signals || {}, p = d.paper || {};
+    const col = v => v == null ? '#888' : v >= 45 ? '#089981' : v >= 30 ? '#fbbf24' : '#f23645';
+    const trd = s.wr_trend_7_vs_30;
+    const trdHtml = trd == null ? '' :
+      `<span style="color:${trd >= 0 ? '#089981' : '#f23645'};font-size:11px;font-weight:700">${trd >= 0 ? '▲' : '▼'} ${trd >= 0 ? '+' : ''}${trd}pp</span>`;
+    const stat = (k, v, c) => `<div style="background:#0d0d14;border:1px solid #1e1e28;border-radius:6px;padding:7px 9px">
+        <div style="font-size:8.5px;color:#555;text-transform:uppercase;letter-spacing:.4px">${k}</div>
+        <div style="font-size:14px;font-weight:700;font-family:'Courier New',monospace;color:${c||'#fff'};margin-top:2px">${v}</div></div>`;
+    const chip = (x, good) => {
+      const wr = x.wr != null ? Math.round(x.wr * 100) : '?';
+      const c = good ? '#089981' : '#f23645';
+      return `<span style="display:inline-flex;gap:5px;align-items:center;background:${c}14;border:1px solid ${c}40;color:${c};border-radius:4px;padding:2px 7px;font-size:10px;white-space:nowrap">${x.was} <b style="opacity:.85">${wr}%·N${x.n}</b></span>`;
+    };
+    const tfBar = Object.entries(d.timeframes || {}).map(([tf, v]) => {
+      const r = v.resolved_pct;
+      const rc = r == null ? '#555' : r >= 70 ? '#089981' : r >= 45 ? '#fbbf24' : '#f23645';
+      return `<div style="display:flex;align-items:center;gap:8px;font-size:10px;margin-top:3px">
+          <span style="width:30px;color:#888;font-weight:700">${tf}</span>
+          <div style="flex:1;height:5px;background:#14141c;border-radius:3px;overflow:hidden"><div style="width:${r||0}%;height:5px;background:${rc}"></div></div>
+          <span style="width:96px;text-align:right;color:#666">WR ${v.win_rate}% · auflös ${r==null?'–':r+'%'}</span></div>`;
+    }).join('');
+    el.innerHTML = `
+      <div style="display:flex;justify-content:space-between;align-items:baseline;margin:2px 2px 7px">
+        <span style="font-size:11px;color:#888">Win-Rate (entschieden)</span>
+        <span>${trdHtml} <span style="font-size:11px;color:#555">7d→30d</span></span>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px">
+        ${stat('7 Tage', (s.wr_7d??'–')+'%', col(s.wr_7d))}
+        ${stat('30 Tage', (s.wr_30d??'–')+'%', col(s.wr_30d))}
+        ${stat('Gesamt', (s.wr_all??'–')+'%', col(s.wr_all))}
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-top:6px">
+        ${stat('Paper-Saldo', '$'+(p.balance??'–'), (p.pnl>=0?'#089981':'#f23645'))}
+        ${stat('Paper-WR', (p.win_rate??'–')+'%', col(p.win_rate))}
+        ${stat('Trades / offen', (p.trades??0)+' / '+(p.open_positions??0), '#fff')}
+      </div>
+      <div style="margin-top:10px"><div style="font-size:9px;color:#555;text-transform:uppercase;letter-spacing:.4px;margin-bottom:5px">Bevorzugt ▲</div>
+        <div style="display:flex;flex-wrap:wrap;gap:5px">${(d.favored||[]).map(x=>chip(x,true)).join('')||'<span style="color:#444;font-size:10px">—</span>'}</div></div>
+      <div style="margin-top:8px"><div style="font-size:9px;color:#555;text-transform:uppercase;letter-spacing:.4px;margin-bottom:5px">Gemieden ▼</div>
+        <div style="display:flex;flex-wrap:wrap;gap:5px">${(d.avoided||[]).map(x=>chip(x,false)).join('')||'<span style="color:#444;font-size:10px">—</span>'}</div></div>
+      <div style="margin-top:10px"><div style="font-size:9px;color:#555;text-transform:uppercase;letter-spacing:.4px;margin-bottom:3px">Timeframe-Effizienz (Auflösungsquote)</div>${tfBar}</div>
+      <div style="margin-top:9px;display:flex;gap:8px;flex-wrap:wrap;font-size:10px;color:#666">
+        <span style="background:#0d0d14;border:1px solid #1e1e28;border-radius:4px;padding:2px 8px">Regime: <b style="color:#a78bfa">${d.regime?.phase??'?'}</b></span>
+        <span style="background:#0d0d14;border:1px solid #1e1e28;border-radius:4px;padding:2px 8px">Shorts: ${d.regime?.allow_shorts?'✓':'✗'}</span>
+        <span style="background:#0d0d14;border:1px solid #1e1e28;border-radius:4px;padding:2px 8px">KI-Modell: ${d.model?.active?'aktiv '+d.model.accuracy+'%':'aus'}</span>
+      </div>`;
+  } catch (e) {
+    el.innerHTML = `<div style="color:#f23645;font-size:11px">Health nicht erreichbar</div>`;
+  }
 }
 
 // ── Paper Trading Panel ────────────────────────────────────────────
