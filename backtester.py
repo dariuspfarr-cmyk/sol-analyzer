@@ -9,6 +9,7 @@ Backtester — kostenlose Signalgenerierung auf historischen Binance-Daten.
 - Läuft jeden Montag 02:00 UTC neu auf frischen Daten
 """
 
+import time
 import requests
 import pandas as pd
 from datetime import datetime, timezone
@@ -20,8 +21,12 @@ import config as cfg
 
 BINANCE_BASE = "https://api.binance.com/api/v3"
 SYMBOL       = "SOLUSDT"
-TIMEFRAMES   = ["4h", "30m"]
+# Mehr Timeframes (1d/4h/1h/30m; 15m bewusst raus = Rausch) für mehr echte Daten.
+TIMEFRAMES   = ["1d", "4h", "1h", "30m"]
 CANDLES      = 1000
+# TIEFE History je Timeframe (paginiert) — vervielfacht die echten Trainingslabels.
+# Längere TFs reichen weiter zurück; kürzere weniger (sonst explodiert die Laufzeit).
+TF_CANDLES   = {"1d": 1200, "4h": 2500, "1h": 2500, "30m": 1500}
 OUTCOME_WINDOW = 50   # Kerzen für Outcome-Simulation
 MIN_WINDOW     = 30   # Mindest-Kerzen für SMC-Zonen
 
@@ -156,21 +161,35 @@ _STAMP = Path(__file__).parent / ".last_backtest_run"
 
 # ── Binance-Daten (nur OHLCV, kostenlos) ────────────────────────────────────
 def _fetch_ohlcv(symbol: str, interval: str, limit: int = CANDLES) -> pd.DataFrame:
-    r = requests.get(
-        f"{BINANCE_BASE}/klines",
-        params={"symbol": symbol, "interval": interval, "limit": limit},
-        timeout=20,
-    )
-    r.raise_for_status()
-    raw = r.json()
-    df  = pd.DataFrame(raw, columns=[
+    """Lädt bis zu `limit` Kerzen — paginiert rückwärts (Binance max. 1000/Call),
+    um TIEFE History zu ziehen (mehr echte Trainingsdaten)."""
+    rows: list = []
+    end_time = None
+    while len(rows) < limit:
+        params = {"symbol": symbol, "interval": interval,
+                  "limit": min(1000, limit - len(rows))}
+        if end_time is not None:
+            params["endTime"] = end_time
+        r = requests.get(f"{BINANCE_BASE}/klines", params=params, timeout=20)
+        r.raise_for_status()
+        chunk = r.json()
+        if not chunk:
+            break
+        rows = chunk + rows                 # ältere Kerzen vorne anhängen
+        end_time = int(chunk[0][0]) - 1     # vor die älteste geladene Kerze springen
+        if len(chunk) < params["limit"]:
+            break                           # keine weitere History verfügbar
+        time.sleep(0.12)                    # Binance-Ratelimit höflich behandeln
+
+    df = pd.DataFrame(rows, columns=[
         "time","open","high","low","close","volume",
         "close_time","quote_vol","trades","taker_buy_base","taker_buy_quote","ignore",
     ])
     for col in ["open","high","low","close","volume"]:
         df[col] = df[col].astype(float)
     df["time"] = pd.to_datetime(df["time"], unit="ms", utc=True)
-    return df[["time","open","high","low","close","volume"]].copy()
+    df = df[["time","open","high","low","close","volume"]].drop_duplicates("time")
+    return df.sort_values("time").reset_index(drop=True)
 
 
 # ── SMC-Zonen (identisch mit calc_smc_zones im Hauptbot) ────────────────────
@@ -328,11 +347,10 @@ def _run_for_timeframe(df: pd.DataFrame, timeframe: str,
         zone_pos  = ("premium" if price >= p_bot else
                      "discount" if price <= d_top else "neutral")
 
-        score, samples, live_conf = weights.score(ptype, bias, timeframe, zone_pos, hour)
-        threshold = weights.skip_threshold(live_conf)
-        if samples >= SCORE_MIN_SAMPLES and score < threshold:
-            results["score_skip"] += 1
-            continue   # dieses Muster hat sich als schlecht erwiesen → überspringen
+        # Für MAXIMALE Trainingsdaten: ALLE getriggerten (deduplizierten) Signale mit
+        # Outcome loggen — auch schwache. Das Lernen braucht auch die Verlierer, um zu
+        # erkennen WAS verliert. Selektivität greift erst beim echten Trade (Scoring/
+        # Floor), nicht bei der Datensammlung. (Vorher: score_skip → weniger Daten.)
 
         entry, sl, tp, _, _ = signal_logger._derive_sl_tp(zones, bias)
         if sl <= 0 or tp <= 0 or abs(entry - sl) / entry > 0.25:
@@ -381,9 +399,15 @@ def run(force: bool = False) -> None:
 
     print(f"\n{'═'*58}")
     print(f"  📊  BACKTEST STARTET — {SYMBOL}")
-    print(f"  Zeiträume: {', '.join(TIMEFRAMES)}  |  {CANDLES} Kerzen je TF")
+    print(f"  Zeiträume: {', '.join(TIMEFRAMES)}  |  Tiefe je TF: {TF_CANDLES}")
     print("  API-Kosten: $0.00 (nur Binance OHLCV, kostenlos)")
     print(f"{'═'*58}")
+
+    # Frischer, deduplizierter Datensatz: alte BACKTEST-Signale löschen, dann über
+    # die volle (tiefe) History neu simulieren. LIVE-Signale bleiben unberührt.
+    removed = _clear_backtest_signals()
+    if removed:
+        print(f"  🧹 {removed} alte Backtest-Signale entfernt (Neu-Simulation, kein Doppeln).")
 
     all_results: dict[str, dict] = {}
 
@@ -393,9 +417,10 @@ def run(force: bool = False) -> None:
     weights.seed_from_live()
 
     for tf in TIMEFRAMES:
-        print(f"\n  → Lade {CANDLES} {tf}-Kerzen für {SYMBOL}…")
+        n_target = TF_CANDLES.get(tf, CANDLES)
+        print(f"\n  → Lade bis zu {n_target} {tf}-Kerzen für {SYMBOL} (paginiert)…")
         try:
-            df = _fetch_ohlcv(SYMBOL, tf)
+            df = _fetch_ohlcv(SYMBOL, tf, n_target)
             print(f"  → {len(df)} Kerzen geladen. Starte Replay (lernt inkrementell)…")
         except Exception as e:
             print(f"  ⚠️  Fehler beim Laden von {tf}: {e}")
@@ -466,6 +491,18 @@ def _print_summary(results: dict) -> None:
 _LIVE_STAMP = Path(__file__).parent / ".last_backtest_live_count"
 
 
+def _clear_backtest_signals() -> int:
+    """Löscht alle source='BACKTEST'-Signale (für eine frische, deduplizierte
+    Neu-Simulation). LIVE/ALGO-Signale bleiben unberührt."""
+    try:
+        conn = signal_logger._conn()
+        cur = conn.execute("DELETE FROM signals WHERE source = 'BACKTEST'")
+        conn.commit()
+        return cur.rowcount or 0
+    except Exception:
+        return 0
+
+
 def _count_live_signals() -> int:
     """Zählt abgeschlossene Signale aus Live-Trading (nicht aus Backtest)."""
     try:
@@ -494,17 +531,16 @@ def should_run_now() -> bool:
 
     now = datetime.now(timezone.utc)
 
-    # Wöchentliche Auffrischung (Montag 02:00 UTC)
-    if now.weekday() == 0 and now.hour == 2:
-        if _STAMP.exists():
-            try:
-                last = datetime.fromisoformat(_STAMP.read_text().strip())
-                if (now - last).total_seconds() < 20 * 3600:
-                    pass   # heute schon gelaufen → trotzdem Live-Trigger prüfen
-                else:
-                    return True
-            except Exception:
-                return True
+    # TÄGLICHE Auffrischung: einmal pro Tag tiefen Backtest laufen lassen (mehr
+    # echte Daten + neueste Kerzen). Gated über den Zeitstempel des letzten Laufs.
+    if not _STAMP.exists():
+        return True
+    try:
+        last = datetime.fromisoformat(_STAMP.read_text().strip())
+        if (now - last).total_seconds() >= 20 * 3600:
+            return True
+    except Exception:
+        return True
 
     # Auto-Trigger: genug neue Live-Signale seit letztem Backtest
     current_live = _count_live_signals()

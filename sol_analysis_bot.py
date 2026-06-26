@@ -759,9 +759,9 @@ def main():
             df_4h, tf_dfs={tf: r["df"] for tf, r in mtf.items()}
         )
 
-    # ── INTEGRATION 2: Backtest (wenn DB < 200 oder Montag 02:00) ────
+    # ── INTEGRATION 2: Tiefer Backtest (täglich; Gate in should_run_now) ────
     if backtester.should_run_now():
-        backtester.run()
+        backtester.run(force=True)
 
     # ── INTEGRATION 3: Wöchentliche Optimierung (sonntags) ───────────
     _run_weekly_if_due()
