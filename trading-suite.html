@@ -8449,6 +8449,13 @@ async function lvLoadHealth() {
           ${stat('erzeugt', d.improvements.created, '#a78bfa')}
           ${stat('gefüllt', (d.improvements.fill_pct??'–')+'%', '#fff')}
           ${stat('davon WR', (d.improvements.win_rate??'–')+'%', col(d.improvements.win_rate))}
+        </div></div>` : ''}
+      ${(d.discoveries&&d.discoveries.length) ? `<div style="margin-top:10px"><div style="font-size:9px;color:#7b61ff;text-transform:uppercase;letter-spacing:.4px;margin-bottom:5px">◈ Selbst-entdeckte Edges (validiert)</div>
+        <div style="display:flex;flex-wrap:wrap;gap:5px">${d.discoveries.map(x=>{const g=x.action==='BOOST';const c=g?'#089981':'#f23645';return `<span style="background:${c}14;border:1px solid ${c}40;color:${c};border-radius:4px;padding:2px 7px;font-size:10px;white-space:nowrap">${x.was} <b>${x.lift_pp>0?'+':''}${x.lift_pp}pp·N${x.n}</b></span>`}).join('')}</div></div>` : ''}
+      ${d.catalyst ? `<div style="margin-top:10px"><div style="font-size:9px;color:#555;text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px">Katalysator ${d.catalyst.risk_off?'<span style="color:#f23645">· RISK-OFF</span>':''}</div>
+        <div style="font-size:10px;color:#888;line-height:1.6">
+          ${(d.catalyst.next_events&&d.catalyst.next_events.length)?'📅 '+d.catalyst.next_events.join(' · '):'<span style="color:#555">keine High-Impact-Events in 24h</span>'}
+          ${(d.catalyst.bias_hints||[]).map(h=>`<div style="color:#fbbf24">↳ ${h}</div>`).join('')}
         </div></div>` : ''}`;
   } catch (e) {
     el.innerHTML = `<div style="color:#f23645;font-size:11px">Health nicht erreichbar</div>`;

@@ -58,6 +58,8 @@ IMPROVEMENTS.md
 bull_run_cache.json
 daily_performance.json
 entry_optimizer.json
+discovered_rules.json
+research_log.json
 .last_backtest_live_count
 .last_backtest_run
 .last_daily_summary

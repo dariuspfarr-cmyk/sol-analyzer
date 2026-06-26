@@ -960,6 +960,20 @@ def _score_signal(row: dict, market_bias: str, hourly_perf: dict,
     if rules_mod != 0.0:
         composite += rules_mod
 
+    # Selbst-entdeckte Feature-Edges (research_agent: validierte Hypothesen)
+    try:
+        import research_agent
+        composite += research_agent.score_modifier(row)
+    except Exception:
+        pass
+
+    # Katalysator-Risiko: Score-Abschlag bei imminentem High-Impact-Event
+    try:
+        import catalyst
+        composite += catalyst.score_adjust()
+    except Exception:
+        pass
+
     # ── Neue Indikatoren ───────────────────────────────────────────────────────
 
     # MACD Confluence

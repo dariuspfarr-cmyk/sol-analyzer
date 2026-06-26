@@ -161,6 +161,17 @@ def run(force: bool = False) -> dict:
     except Exception as e:
         entry["actions"].append(f"Entry-Optimizer: Fehler ({e})")
 
+    # ── 2c. Research-Agent: Feature-Selbstentdeckung + Auto-Rollback ──────────
+    try:
+        import research_agent
+        ra = research_agent.run()
+        entry["actions"].append(
+            f"Research-Agent: {ra['adopted']} Feature-Edges aktiv "
+            f"(+{ra['added']} neu · -{ra['retired']} zurückgezogen"
+            + (" · LLM" if ra.get("llm_used") else "") + ")")
+    except Exception as e:
+        entry["actions"].append(f"Research-Agent: Fehler ({e})")
+
     # ── 3. Thresholds optimieren (mit Backup + Auto-Rollback) ────────────────
     backed_up = _backup_config()
     try:

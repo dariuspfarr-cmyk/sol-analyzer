@@ -153,6 +153,29 @@ def snapshot() -> dict:
     except Exception:
         pass
 
+    # ── Selbst-entdeckte Feature-Edges (research_agent) ───────────────────────
+    rj = _load("discovered_rules.json")
+    if rj.get("rules"):
+        out["discoveries"] = [
+            {"was": f"{r['feature']}={r['value']}", "action": r["action"],
+             "lift_pp": r.get("lift_pp"), "n": r.get("samples"),
+             "mod": r.get("score_modifier")}
+            for r in sorted(rj["rules"], key=lambda x: abs(x.get("lift_pp", 0)), reverse=True)[:6]
+        ]
+
+    # ── Katalysator (anstehende Events + Sentiment-Extreme) ───────────────────
+    try:
+        import catalyst
+        c = catalyst.snapshot()
+        out["catalyst"] = {
+            "risk_off": c.get("risk_off"),
+            "imminent": (c["imminent_event"]["title"] if c.get("imminent_event") else None),
+            "next_events": [f"{e['title']} (in {e['in_hours']}h)" for e in c.get("upcoming_events", [])[:3]],
+            "bias_hints": c.get("bias_hints", [])[:3],
+        }
+    except Exception:
+        pass
+
     # ── XGBoost-Modell-Status ─────────────────────────────────────────────────
     mr = _load("model_report.json")
     if mr:
