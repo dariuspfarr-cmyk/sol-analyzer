@@ -216,10 +216,14 @@ def api_submit_signal(body: dict) -> dict:
 
         # Auf dem GELERNTEN Entry-Level loggen (Pullback-Limit), nicht am Trigger —
         # so wartet die Order auf die Rückkehr des Marktes und füllt am besseren Preis.
+        # Quelle (improved/learned) im Label markieren → messbar im Health-Snapshot,
+        # ob die "Verbesserung-statt-Block"-Trades wirklich füllen & gewinnen.
         entry_eff = verdict.get("entry_planned", entry)
+        _src      = verdict.get("source")
+        _label    = label if _src in (None, "default") else f"{label} [{_src}]"
         sig_id = signal_logger.log_autoki_signal(
             direction=direction, entry=entry_eff, sl=sl, tp=tp, rsi=rsi,
-            label=label, conf=conf, timeframe=timeframe,
+            label=_label, conf=conf, timeframe=timeframe,
         )
         _sse_broadcast("new_signal", {"signal_id": sig_id, "source": "AUTO_KI"})
         return {"ok": True, "tradeable": True, "signal_id": sig_id,

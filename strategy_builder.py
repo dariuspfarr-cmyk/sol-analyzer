@@ -96,7 +96,8 @@ PROFILES: dict[str, dict] = {
     },
 }
 
-MIN_SAMPLES    = 5      # Mindest-Samples für eine valide Regel
+MIN_SAMPLES    = 12     # Mindest-Samples für eine valide Regel (Überanpassungs-Schutz:
+                        # vorher 5 → Regeln auf N=5-Rauschen; 12 verlangt echte Evidenz)
 BOOST_WR       = 0.62   # WR ≥ 62% → BOOST
 BLOCK_WR       = 0.38   # WR ≤ 38% → BLOCK
 STRONG_BOOST   = 0.72   # WR ≥ 72% → starker BOOST
@@ -148,7 +149,10 @@ def _combo_strength(wr: float, baseline: float) -> str | None:
 
 
 def _confidence(n: int, max_n: int = 100) -> float:
-    return round(min(0.95, 0.40 + (n / max_n) * 0.55), 3)
+    # Steiler + niedrigerer Boden (Überanpassungs-Schutz): eine gerade-so-valide
+    # Regel (N≈12) wirkt nur schwach (~0.25-0.34), volle Wirkung erst mit viel
+    # Evidenz. Vorher Boden 0.40 → dünne Regeln zu stark gewichtet.
+    return round(min(0.95, 0.15 + (n / max_n) * 0.80), 3)
 
 
 def run() -> dict:

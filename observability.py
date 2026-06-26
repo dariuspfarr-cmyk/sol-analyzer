@@ -68,6 +68,29 @@ def snapshot() -> dict:
     except Exception as e:
         out["signals"] = {"error": str(e)}
 
+    # ── "Verbesserung statt Block": füllen & gewinnen die Pullback-Trades? ────
+    # Misst die source='improved'-Signale (im trigger_reason markiert): wie viele
+    # erzeugt, wie viele gefüllt (getradet), wie das Outcome ist. So sieht man, ob
+    # die aggressive Improve-Logik real trägt — oder nur EXPIRED produziert.
+    try:
+        con = sqlite3.connect(BASE / "signals.db", timeout=8)
+        con.row_factory = sqlite3.Row
+        imp = con.execute(
+            "SELECT paper_traded, outcome FROM signals "
+            "WHERE trigger_reason LIKE '%[improved]%'"
+        ).fetchall()
+        con.close()
+        filled = [r for r in imp if r["paper_traded"]]
+        out["improvements"] = {
+            "created":    len(imp),
+            "filled":     len(filled),
+            "fill_pct":   round(100.0 * len(filled) / len(imp), 1) if imp else None,
+            "win_rate":   _wr([r["outcome"] for r in filled]),
+            "expired":    sum(1 for r in imp if r["outcome"] == "EXPIRED"),
+        }
+    except Exception:
+        pass
+
     # ── Paper Trader (echter Kontostand/Trades) ───────────────────────────────
     st = _load("state.json")
     if st:

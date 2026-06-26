@@ -8443,7 +8443,13 @@ async function lvLoadHealth() {
         <span style="background:#0d0d14;border:1px solid #1e1e28;border-radius:4px;padding:2px 8px">Regime: <b style="color:#a78bfa">${d.regime?.phase??'?'}</b></span>
         <span style="background:#0d0d14;border:1px solid #1e1e28;border-radius:4px;padding:2px 8px">Shorts: ${d.regime?.allow_shorts?'✓':'✗'}</span>
         <span style="background:#0d0d14;border:1px solid #1e1e28;border-radius:4px;padding:2px 8px">KI-Modell: ${d.model?.active?'aktiv '+d.model.accuracy+'%':'aus'}</span>
-      </div>`;
+      </div>
+      ${d.improvements ? `<div style="margin-top:9px"><div style="font-size:9px;color:#555;text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px">Verbesserung-statt-Block — Wirkung</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px">
+          ${stat('erzeugt', d.improvements.created, '#a78bfa')}
+          ${stat('gefüllt', (d.improvements.fill_pct??'–')+'%', '#fff')}
+          ${stat('davon WR', (d.improvements.win_rate??'–')+'%', col(d.improvements.win_rate))}
+        </div></div>` : ''}`;
   } catch (e) {
     el.innerHTML = `<div style="color:#f23645;font-size:11px">Health nicht erreichbar</div>`;
   }
