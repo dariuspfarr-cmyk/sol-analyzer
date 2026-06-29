@@ -5397,10 +5397,11 @@ class LiveChart {
       ctx.setLineDash([4,3]);
       ctx.beginPath(); ctx.moveTo(x0,tpY); ctx.lineTo(x1,tpY); ctx.stroke();
 
-      // Entry-Linie (weiß, sehr dezent)
-      ctx.strokeStyle = 'rgba(255,255,255,0.18)';
-      ctx.lineWidth = 1;
-      ctx.setLineDash([2,5]);
+      // Entry-/Limit-Linie — bei wartendem Limit amber & deutlicher (Pullback)
+      const pend = !!s.pending;
+      ctx.strokeStyle = pend ? '#fbbf24cc' : 'rgba(255,255,255,0.18)';
+      ctx.lineWidth   = pend ? 1.3 : 1;
+      ctx.setLineDash(pend ? [5,3] : [2,5]);
       ctx.beginPath(); ctx.moveTo(x0,entryY); ctx.lineTo(x1,entryY); ctx.stroke();
       ctx.setLineDash([]);
 
@@ -5411,8 +5412,13 @@ class LiveChart {
       ctx.fillText('SL  $'+s.sl.toFixed(2), x1-2, slY+(slY>entryY?-3:11));
       ctx.fillStyle = '#089981';
       ctx.fillText('TP  $'+s.tp.toFixed(2), x1-2, tpY+(tpY<entryY?-3:11));
-      ctx.fillStyle = 'rgba(255,255,255,0.35)';
-      ctx.fillText('$'+((s.entryPrice||c.c).toFixed(2)), x1-2, entryY-3);
+      if (pend) {   // wartendes Limit deutlich markieren
+        ctx.fillStyle = '#fbbf24';
+        ctx.fillText('⏳ LIMIT $'+((s.entryPrice||c.c).toFixed(2)), x1-2, entryY-3);
+      } else {
+        ctx.fillStyle = 'rgba(255,255,255,0.35)';
+        ctx.fillText('$'+((s.entryPrice||c.c).toFixed(2)), x1-2, entryY-3);
+      }
       }
     }
 
@@ -5455,8 +5461,8 @@ class LiveChart {
           ctx.fillText(Math.round(s.conf*100)+'%',x,isL?ey+12:ey-6);
         }
         if(this.candleW>7){
-          const lbl = s.label || (isL?'▲L':'▼S');
-          ctx.fillStyle=col+(isBreak?'ff':'bb'); ctx.font=`bold 9px Segoe UI`;
+          const lbl = s.pending ? '⏳ wartet' : (s.label || (isL?'▲L':'▼S'));
+          ctx.fillStyle = s.pending ? '#fbbf24' : col+(isBreak?'ff':'bb'); ctx.font=`bold 9px Segoe UI`;
           ctx.fillText(lbl, x, isL?ey+(s.conf!=null?22:14):ey-(s.conf!=null?20:12));
         }
       }
@@ -6927,7 +6933,15 @@ class AutoSignalEngine {
     if (log) { log.insertBefore(card,log.firstChild); if(log.children.length>20) log.lastChild?.remove(); }
     const cnt=document.getElementById('lv-sigCount');
     if (cnt) cnt.textContent=(log?.children.length||0)+'';
-    this.signals.push({...sig, price:candle.c, entryPrice:planned, entryFill:fillV, time:Date.now()});
+    // Server-Verdict auf das Chart-Signal übertragen → der Marker im Chart zeigt
+    // jetzt Pending/Limit-Status (wartet auf Pullback) statt eines normalen Signals.
+    sig.pending    = pending;
+    sig.entryPrice = planned;
+    sig.entryFill  = fillV;
+    sig.signalId   = res.signal_id;
+    sig.fillRate   = res.fill_rate;
+    if (this.chart && this.chart.render) this.chart.render();
+    this.signals.push({...sig, price:candle.c, time:Date.now()});
   }
 
   _showAlert(sig, candle, res) {
