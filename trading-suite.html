@@ -6,44 +6,53 @@
 <title>SOL Trading Suite</title>
 <style>
 :root{
-  --bg:#070707;--s1:#0e0e0e;--s2:#141414;--s3:#1b1b1b;
-  --b:#252525;--b2:#333;
-  --text:#f0f0f0;--dim:#aaa;--muted:#666;--faint:#333;
+  --bg:#08080d;--s1:#0f0f16;--s2:#16161f;--s3:#1e1e2b;
+  --b:#272733;--b2:#363648;
+  --text:#f2f2f7;--dim:#a6a6b6;--muted:#6b6b80;--faint:#363648;
   --g:#22c55e;--r:#ef4444;
+  /* Marken-Akzent + Design-Tokens (visueller Refresh) */
+  --accent:#7c6cff;--accent2:#a78bfa;--accent-dim:rgba(124,108,255,.14);
+  --rs:6px;--rm:9px;--rl:14px;
+  --shadow:0 8px 28px rgba(0,0,0,.5);
+  --chrome:rgba(10,10,16,.82);
+  --hdr:46px;--nav:60px;
 }
 *{margin:0;padding:0;box-sizing:border-box;}
 html,body{height:100%;overflow-x:clip;max-width:100%;}
 /* Kein seitliches Scrollen ins Leere: alles, was breiter als der Viewport ist
    (Tabellen, Toolbars), scrollt NUR in seinem eigenen Container (overflow-x:auto),
    nie die ganze Seite. clip lockt horizontal, ohne einen 2. Scroller zu erzeugen. */
-body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,sans-serif;font-size:13px;line-height:1.5;display:flex;flex-direction:column;min-height:100vh;}
+body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,sans-serif;font-size:13px;line-height:1.5;display:flex;flex-direction:column;height:100vh;height:100dvh;overflow:hidden;}
 
-/* ── HEADER ── */
-header{height:42px;border-bottom:1px solid var(--b);display:flex;align-items:center;padding:0 20px;gap:14px;flex-shrink:0;background:var(--bg);}
-.logo{font-size:14px;font-weight:700;letter-spacing:3.5px;color:#fff;text-transform:uppercase;}
-.logo span{color:var(--muted);font-weight:400;}
-.mnav{margin-left:auto;display:flex;gap:1px;}
-.mnav button{background:none;border:none;border-bottom:2px solid transparent;color:var(--muted);font-size:10.5px;font-weight:600;letter-spacing:1.2px;text-transform:uppercase;padding:13px 13px;cursor:pointer;transition:color .15s;display:inline-flex;align-items:center;gap:7px;}
-.mn-ic{font-size:12px;line-height:1;opacity:.8;}
-.mnav button.on .mn-ic{opacity:1;}
+/* ── HEADER (oben fixiert) ── */
+header{height:var(--hdr);border-bottom:1px solid var(--b);display:flex;align-items:center;padding:0 18px;gap:12px;flex-shrink:0;background:var(--chrome);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);position:sticky;top:0;z-index:150;}
+.logo{font-size:14px;font-weight:800;letter-spacing:3px;color:#fff;text-transform:uppercase;}
+.logo span{color:var(--accent2);font-weight:400;}
+.hdr-status{margin-left:auto;display:flex;align-items:center;gap:12px;font-size:11px;color:var(--dim);font-family:'Courier New',monospace;}
+
+/* ── HAUPT-NAV als feste untere Leiste (iPhone + Desktop) ── */
+.mnav{position:fixed;left:0;right:0;bottom:0;z-index:200;height:calc(var(--nav) + env(safe-area-inset-bottom,0));display:flex;gap:0;background:var(--chrome);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border-top:1px solid var(--b);box-shadow:0 -4px 22px rgba(0,0,0,.45);padding-bottom:env(safe-area-inset-bottom,0);}
+.mnav button{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;background:none;border:none;border-top:2px solid transparent;color:var(--muted);font-size:9.5px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;cursor:pointer;transition:color .15s,background .15s;}
+.mn-ic{font-size:17px;line-height:1;opacity:.65;transition:opacity .15s;}
 .mnav button:hover{color:var(--dim);}
-.mnav button.on{color:#fff;border-bottom-color:#fff;}
+.mnav button.on{color:#fff;border-top-color:var(--accent);background:var(--accent-dim);}
+.mnav button.on .mn-ic{opacity:1;color:var(--accent2);}
 
-/* ── SUB NAV ── */
-.snav{height:33px;border-bottom:1px solid var(--b);display:flex;align-items:center;padding:0 20px;gap:0;background:var(--s1);overflow-x:auto;flex-shrink:0;}
-.snav button{background:none;border:none;border-bottom:1px solid transparent;color:var(--muted);font-size:11px;font-weight:500;letter-spacing:.5px;padding:0 13px;height:100%;cursor:pointer;white-space:nowrap;transition:color .15s;}
-.snav button:hover{color:var(--dim);}
-.snav button.on{color:#fff;border-bottom-color:#fff;}
+/* ── SUB NAV (sticky unter dem Kopf) ── */
+.snav{height:34px;border-bottom:1px solid var(--b);display:flex;align-items:center;padding:0 16px;gap:2px;background:var(--s1);overflow-x:auto;flex-shrink:0;}
+.snav button{background:none;border:none;color:var(--muted);font-size:11px;font-weight:600;letter-spacing:.3px;padding:5px 11px;border-radius:var(--rs);cursor:pointer;white-space:nowrap;transition:color .15s,background .15s;}
+.snav button:hover{color:var(--dim);background:var(--s2);}
+.snav button.on{color:#fff;background:var(--accent-dim);}
 
-/* ── LAYOUT ── */
-main{flex:1;overflow:auto;overscroll-behavior:none;}
+/* ── LAYOUT ── main ist der einzige Scroller; Platz für die untere Navi ── */
+main{flex:1;overflow:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;padding-bottom:calc(var(--nav) + env(safe-area-inset-bottom,0));}
 .sec{display:none;}
 .sec.on{display:block;}
 .pg{display:none;padding:16px 20px;}
 .pg.on{display:block;}
 
 /* ── CARDS ── */
-.card{background:var(--s1);border:1px solid var(--b);border-radius:7px;padding:13px;}
+.card{background:var(--s1);border:1px solid var(--b);border-radius:var(--rm);padding:13px;box-shadow:0 1px 3px rgba(0,0,0,.3);}
 .card+.card{margin-top:11px;}
 .cl{font-size:9.5px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:9px;}
 
@@ -187,7 +196,8 @@ canvas{display:block;width:100%;}
 .lv-lg-tri-dn { width:0; height:0; border-left:7px solid transparent; border-right:7px solid transparent; border-top:11px solid; flex-shrink:0; margin:0 7px; }
 .lv-lg-band { width:28px; height:13px; border-radius:2px; border-top:2px solid; border-bottom:2px solid; background:transparent; flex-shrink:0; }
 /* ══ LIVE CHART ═══════════════════════════════════════════════ */
-#sec-live { height:calc(100vh - 75px); display:flex; flex-direction:column; overflow:hidden; }
+#sec-live { display:none; }
+#sec-live.on { display:flex; flex-direction:column; height:calc(100dvh - var(--hdr) - var(--nav) - 62px); overflow:hidden; }
 .lv-layout { display:grid; grid-template-columns:1fr 270px; flex:1; min-height:0; }
 .lv-chart-col { display:flex; flex-direction:column; background:#060609; min-width:0; border-right:1px solid #1a1a22; }
 .lv-toolbar { height:36px; display:flex; align-items:center; gap:5px; padding:0 12px; border-bottom:1px solid #14141c; background:#09090e; flex-shrink:0; overflow-x:auto; }
@@ -199,7 +209,7 @@ canvas{display:block;width:100%;}
 .lv-sep { width:1px; height:20px; background:#1e1e28; margin:0 4px; flex-shrink:0; }
 .lv-ibtn { background:none; border:none; color:#555; font-size:11px; font-weight:600; padding:4px 8px; border-radius:3px; cursor:pointer; transition:all .15s; letter-spacing:.5px; }
 .lv-ibtn:hover { color:#aaa; background:#14141c; }
-.lv-ibtn.on { color:#fff; background:#1e1e2e; }
+.lv-ibtn.on { color:#fff; background:var(--accent-dim); box-shadow:inset 0 0 0 1px var(--accent); }
 .lv-ind { background:none; border:1px solid #232330; color:#666; font-size:10px; font-weight:600; padding:3px 9px; border-radius:4px; cursor:pointer; transition:all .15s; white-space:nowrap; }
 .lv-ind:hover { color:#bbb; border-color:#3a3a4a; }
 .lv-ind.on { color:#1cd4a8; border-color:#0e6b58; background:rgba(8,153,129,.16); }
@@ -262,7 +272,7 @@ canvas{display:block;width:100%;}
   padding:8px 4px; cursor:pointer; transition:color .15s;
   display:inline-flex; align-items:center; justify-content:center; gap:6px; }
 .lv-tab:hover { color:#888; }
-.lv-tab.on { color:#fff; border-bottom-color:#fff; }
+.lv-tab.on { color:#fff; border-bottom-color:var(--accent); }
 .lt-ic { font-size:11px; line-height:1; opacity:.85; }
 /* Tab-Panes */
 .lv-pane { display:none; flex-direction:column; flex:1; overflow:hidden; }
@@ -404,26 +414,8 @@ canvas{display:block;width:100%;}
      unteren Rand hinaus — scrollbar statt unter der Bottom-Nav verschwinden. */
   .lv-layers-panel{ max-height:calc(100vh - 78px); overflow-y:auto; }
 
-  /* ─ Haupt-Navigation als feste Bottom-Tab-Bar: mobil-nativ, mit dem Daumen
-       erreichbar, immer sichtbar. Jede Sektion ein Tipp entfernt. ─ */
-  .mnav{
-    position:fixed; left:0; right:0; bottom:0; z-index:600; margin:0;
-    display:flex; gap:0; background:#0a0a0f;
-    border-top:1px solid var(--b); box-shadow:0 -3px 14px rgba(0,0,0,.5);
-    padding-bottom:env(safe-area-inset-bottom,0);
-  }
-  .mnav button{
-    flex:1; flex-direction:column; gap:3px; padding:7px 2px 8px;
-    font-size:8.5px; letter-spacing:.3px; text-align:center; white-space:nowrap;
-    border-bottom:none; border-top:2px solid transparent;
-  }
-  .mnav .mn-ic{ font-size:16px; opacity:.75; }
-  .mnav button.on{ color:#fff; border-top-color:#fff; border-bottom:none;
-    background:rgba(255,255,255,.05); }
-  .mnav button.on .mn-ic{ opacity:1; }
+  /* Kopf + untere Navi werden global (oben) gestylt — mobil nur Feinschliff. */
   header{ padding:0 14px; }
-  /* Inhalt frei von der Bottom-Bar halten (inkl. iPhone Safe-Area) */
-  main{ padding-bottom:calc(56px + env(safe-area-inset-bottom,0)); }
 
   /* ─ Sub-Navigation + Statuszeile: gut tippbar, weich scrollen ─ */
   .snav{ -webkit-overflow-scrolling:touch; }
@@ -433,7 +425,7 @@ canvas{display:block;width:100%;}
   /* ─ Live-Chart: EIN einziger Scroll-Container (main). Chart oben, Panel
        darunter — alles fließt, keine verschachtelten Scrollbereiche (das war
        die Quelle des „Wackelns"). ─ */
-  #sec-live{ height:auto; overflow:visible; }
+  #sec-live.on{ height:auto; overflow:visible; }
   .lv-layout{ display:flex; flex-direction:column; }
   .lv-chart-col{ border-right:none; }
   /* touch-action:pan-y → vertikale Wischgeste scrollt die Seite nativ,
@@ -497,13 +489,7 @@ canvas{display:block;width:100%;}
 <!-- ══ HEADER ══════════════════════════════════════════════════════ -->
 <header>
   <div class="logo">SOL <span>/</span> SUITE</div>
-  <nav class="mnav">
-    <button onclick="showSec('live')"><span class="mn-ic">⬤</span><span class="mn-lb">Live</span></button>
-    <button onclick="showSec('bot')"><span class="mn-ic">◎</span><span class="mn-lb">Bot</span></button>
-    <button class="on" onclick="showSec('strategy')"><span class="mn-ic">◈</span><span class="mn-lb">Strategie</span></button>
-    <button onclick="showSec('backtest')"><span class="mn-ic">▦</span><span class="mn-lb">Backtest</span></button>
-    <button onclick="showSec('journal')"><span class="mn-ic">▤</span><span class="mn-lb">Journal</span></button>
-  </nav>
+  <div class="hdr-status" id="hdrStatus"></div>
 </header>
 
 <!-- ══ SUB-NAV (swaps per section) ══════════════════════════════════ -->
@@ -1777,6 +1763,15 @@ canvas{display:block;width:100%;}
 </div><!-- /sec-bot -->
 
 </main>
+
+<!-- ══ HAUPT-NAV (untere, fixierte Leiste — iPhone + Desktop) ═══════════ -->
+<nav class="mnav">
+  <button onclick="showSec('live')"><span class="mn-ic">⬤</span><span class="mn-lb">Live</span></button>
+  <button onclick="showSec('bot')"><span class="mn-ic">◎</span><span class="mn-lb">Bot</span></button>
+  <button class="on" onclick="showSec('strategy')"><span class="mn-ic">◈</span><span class="mn-lb">Strategie</span></button>
+  <button onclick="showSec('backtest')"><span class="mn-ic">▦</span><span class="mn-lb">Backtest</span></button>
+  <button onclick="showSec('journal')"><span class="mn-ic">▤</span><span class="mn-lb">Journal</span></button>
+</nav>
 <script>
 // ══════════════════════════════════════════════════════════════════
 // NAVIGATION
