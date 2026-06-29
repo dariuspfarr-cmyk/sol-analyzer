@@ -133,6 +133,22 @@ def _modifier(strength: str) -> int:
     return {"STRONG_BOOST": 20, "BOOST": 12, "STRONG_BLOCK": -25, "BLOCK": -15}[strength]
 
 
+def _strength_pf(pf: float, n: int, wr: float | None = None) -> str | None:
+    """
+    Stärke nach PROFIT-FAKTOR (echte Profitabilität), nicht Win-Rate. PF>1 = profitabel
+    auch bei niedriger WR (Gewinner > Verlierer). WR nur als Drawdown-Guardrail.
+    Asymmetrische Sample-Gates: Verlierer schon ab N≥15 meiden, Gewinner erst ab N≥30
+    boosten (nicht überanpassen).
+    """
+    if n < 15:
+        return None
+    if pf <= 0.75:                                          return "STRONG_BLOCK"
+    if pf <= 0.97:                                          return "BLOCK"
+    if pf >= 1.8 and n >= 30 and (wr is None or wr >= 0.15): return "STRONG_BOOST"
+    if pf >= 1.25 and n >= 30:                              return "BOOST"
+    return None   # 0.97 < PF < 1.25 → neutral (kaum Edge)
+
+
 def _combo_strength(wr: float, baseline: float) -> str | None:
     """
     Stärke einer (Setup×Bias)-Kombi RELATIV zur Gesamt-Win-Rate. So werden Kombis,
@@ -223,11 +239,12 @@ def run() -> dict:
 
     for st_name, d in report.get("nach_setup_typ", {}).items():
         wr  = d.get("win_rate_pct", 50) / 100
-        n   = d.get("count", 0)
+        n   = d.get("closed", d.get("count", 0))
         avg_rr = d.get("avg_rr", 1.5)
         if n < MIN_SAMPLES:
             continue
-        st = _strength(wr)
+        # Profit-Faktor entscheidet (nicht WR): profitables Low-WR-Setup → BOOST.
+        st = _strength_pf(d.get("profit_factor", 1.0), n, wr)
         if st is None:
             continue
 
@@ -261,10 +278,10 @@ def run() -> dict:
     # ── 3. Bias-Regeln ────────────────────────────────────────────────────────
     for bias_name, d in report.get("nach_bias", {}).items():
         wr = d.get("win_rate_pct", 50) / 100
-        n  = d.get("count", 0)
+        n  = d.get("closed", d.get("count", 0))
         if n < MIN_SAMPLES or bias_name == "neutral":
             continue
-        st = _strength(wr)
+        st = _strength_pf(d.get("profit_factor", 1.0), n, wr)
         if st is None:
             continue
         rid += 1
@@ -286,13 +303,13 @@ def run() -> dict:
     # Aus echten geschlossenen Signalen: die Interaktion trennt gute von schlechten
     # Kombis sauber (z. B. bullish-CHoCH 0% / bullish-BOS 3% → starkes BLOCK;
     # bearish-Kombis ohne Strafe). Hebt damit die Win-Rate gezielt.
-    baseline = report.get("gesamt", {}).get("win_rate_pct", 50) / 100
     for combo_key, d in report.get("nach_setup_bias", {}).items():
         n = d.get("closed", 0)
         if n < MIN_SAMPLES or d.get("bias") == "neutral":
             continue
         wr = d.get("win_rate_pct", 50) / 100
-        st_strength = _combo_strength(wr, baseline)
+        # Kombi-Entscheidung nach Profit-Faktor (profitabel statt nur hohe WR).
+        st_strength = _strength_pf(d.get("profit_factor", 1.0), n, wr)
         if st_strength is None:
             continue
         rid += 1

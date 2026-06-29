@@ -153,6 +153,20 @@ def snapshot() -> dict:
     except Exception:
         pass
 
+    # ── Profitabilität je Setup (Profit-Faktor — das neue Primärziel) ─────────
+    rep = _load("performance_report.json")
+    by_st = rep.get("nach_setup_typ", {})
+    if by_st:
+        out["profitability"] = sorted(
+            [{"setup": st, "pf": d.get("profit_factor"),
+              "expectancy": d.get("avg_pnl_pct"), "wr": d.get("win_rate_pct"),
+              "n": d.get("closed")}
+             for st, d in by_st.items() if d.get("closed", 0) >= 15],
+            key=lambda x: (x["pf"] or 0), reverse=True)
+        g = rep.get("gesamt", {})
+        out["overall_pf"] = g.get("profit_factor")
+        out["overall_expectancy"] = g.get("avg_pnl_pct")
+
     # ── Selbst-entdeckte Feature-Edges (research_agent) ───────────────────────
     rj = _load("discovered_rules.json")
     if rj.get("rules"):

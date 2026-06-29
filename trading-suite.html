@@ -8431,9 +8431,14 @@ async function lvLoadHealth() {
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-top:6px">
         ${stat('Paper-Saldo', '$'+(p.balance??'–'), (p.pnl>=0?'#089981':'#f23645'))}
-        ${stat('Paper-WR', (p.win_rate??'–')+'%', col(p.win_rate))}
-        ${stat('Trades / offen', (p.trades??0)+' / '+(p.open_positions??0), '#fff')}
+        ${stat('Profit-Faktor', (d.overall_pf??'–'), ((d.overall_pf||0)>=1?'#089981':'#f23645'))}
+        ${stat('Erwartung/Trade', ((d.overall_expectancy>=0?'+':'')+(d.overall_expectancy??'–'))+'%', ((d.overall_expectancy||0)>=0?'#089981':'#f23645'))}
       </div>
+      ${(d.profitability&&d.profitability.length) ? `<div style="margin-top:10px"><div style="font-size:9px;color:#089981;text-transform:uppercase;letter-spacing:.4px;margin-bottom:5px">◈ Profitabilität je Setup (Profit-Faktor)</div>
+        ${d.profitability.map(x=>{const c=(x.pf>=1.25?'#089981':x.pf>=0.98?'#fbbf24':'#f23645');return `<div style="display:flex;align-items:center;gap:8px;font-size:10px;margin-top:3px">
+          <span style="width:48px;color:#aaa;font-weight:700">${x.setup}</span>
+          <div style="flex:1;height:5px;background:#14141c;border-radius:3px;overflow:hidden"><div style="width:${Math.min(100,(x.pf||0)/3*100)}%;height:5px;background:${c}"></div></div>
+          <span style="width:128px;text-align:right;color:#777">PF ${x.pf} · ${x.expectancy>=0?'+':''}${x.expectancy}% · WR ${x.wr}% · N${x.n}</span></div>`}).join('')}</div>` : ''}
       <div style="margin-top:10px"><div style="font-size:9px;color:#555;text-transform:uppercase;letter-spacing:.4px;margin-bottom:5px">Bevorzugt ▲</div>
         <div style="display:flex;flex-wrap:wrap;gap:5px">${(d.favored||[]).map(x=>chip(x,true)).join('')||'<span style="color:#444;font-size:10px">—</span>'}</div></div>
       <div style="margin-top:8px"><div style="font-size:9px;color:#555;text-transform:uppercase;letter-spacing:.4px;margin-bottom:5px">Gemieden ▼</div>

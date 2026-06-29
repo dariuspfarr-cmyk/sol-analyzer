@@ -44,6 +44,19 @@ def _avg_pnl(signals: list[dict]) -> float:
     return round(sum(s["pnl_pct"] for s in closed) / len(closed), 3)
 
 
+def _profit_factor(signals: list[dict]) -> dict:
+    """Profit-Faktor + Brutto-Gewinn/-Verlust einer Signalgruppe (echte Profitabilität).
+    PF = Summe Gewinne / Summe Verluste. PF>1 = profitabel, auch bei niedriger WR."""
+    closed = [s["pnl_pct"] for s in signals if s.get("pnl_pct") is not None
+              and s.get("outcome") in ("WIN", "LOSS")]
+    gross_win  = sum(p for p in closed if p > 0)
+    gross_loss = -sum(p for p in closed if p < 0)
+    pf = (gross_win / gross_loss) if gross_loss > 0 else (9.99 if gross_win > 0 else 0.0)
+    return {"profit_factor": round(pf, 2),
+            "gross_win": round(gross_win, 2),
+            "gross_loss": round(gross_loss, 2)}
+
+
 def _group_by(signals: list[dict], key: str) -> dict[str, list[dict]]:
     groups: dict[str, list] = defaultdict(list)
     for s in signals:
@@ -166,6 +179,7 @@ def run() -> dict[str, Any]:
         "avg_rr":                _avg_rr(signals),
         "current_streak":        streak.get("current_streak", 0),
         "max_loss_streak":       streak.get("max_loss_streak", 0),
+        **_profit_factor(closed),
     }
 
     # API-Signale: echte Win-Rate (nur GESCHLOSSENE) vs. Kosten-Ausbeute (pro Call).
@@ -195,6 +209,7 @@ def run() -> dict[str, Any]:
             "win_rate_pct": _win_rate(grp),
             "avg_pnl_pct": _avg_pnl([s for s in grp if s.get("outcome") in ("WIN","LOSS")]),
             "avg_rr":      _avg_rr(grp),
+            **_profit_factor(grp),
         }
 
     # ── 3. Pro Timeframe ─────────────────────────────────────────────────────
@@ -214,6 +229,7 @@ def run() -> dict[str, Any]:
             "closed":       sum(1 for s in grp if s.get("outcome") in ("WIN", "LOSS")),
             "win_rate_pct": _win_rate(grp),
             "avg_pnl_pct":  _avg_pnl([s for s in grp if s.get("outcome") in ("WIN","LOSS")]),
+            **_profit_factor(grp),
         }
 
     # ── 4b. Pro Setup × Bias (Interaktion — stärkster Win-Rate-Prädiktor) ─────
@@ -233,6 +249,7 @@ def run() -> dict[str, Any]:
             "win_rate_pct": _win_rate(grp),
             "avg_pnl_pct":  _avg_pnl(cl),
             "avg_rr":       _avg_rr(grp),
+            **_profit_factor(grp),
         }
 
     # ── 5. Volumen-Filter-Analyse ─────────────────────────────────────────────
