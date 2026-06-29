@@ -518,6 +518,7 @@ canvas{display:block;width:100%;}
         </div>
         <button class="lv-zoom" onclick="lvZoom(-1)" title="Herauszoomen (−)">−</button>
         <button class="lv-zoom" onclick="lvZoom(1)"  title="Hineinzoomen (+)">+</button>
+        <button class="lv-zoom" onclick="lvReset()" title="Zurücksetzen: aktuellster Stand &amp; Standard-Zoom" style="width:auto;padding:0 7px;font-size:12px">⤢</button>
         <div class="lv-sep"></div>
         <!-- Layer/Indikatoren in aufklappbarem, gruppiertem Panel statt überladener Button-Reihe -->
         <div class="lv-dropdown">
@@ -539,7 +540,9 @@ canvas{display:block;width:100%;}
             </div>
             <div class="lv-lp-group">
               <span class="lv-lp-title">Panels &amp; Sessions</span>
-              <button class="lv-ind on" id="macd-tgl" onclick="lvToggleFeature('macd',this)" title="MACD-Panel">MACD</button>
+              <button class="lv-ind on" id="vol-tgl"  onclick="lvToggleFeature('vol',this)" title="Volumen-Panel ein/aus">Volumen</button>
+              <button class="lv-ind on" id="rsi-tgl"  onclick="lvToggleFeature('rsi',this)" title="RSI-Panel ein/aus">RSI</button>
+              <button class="lv-ind"    id="macd-tgl" onclick="lvToggleFeature('macd',this)" title="MACD-Panel ein/aus (mehr Platz für Kerzen)">MACD</button>
               <button class="lv-ind"    id="sess-tgl" onclick="lvToggleFeature('sessions',this)" title="London / NY Session-Highlights">Sessions</button>
             </div>
           </div>
@@ -4817,7 +4820,7 @@ class LiveChart {
     // Übersichtliche Default-Layer: nur die Essenz (Preis + EMA 21/200 + Trendlinien
     // + Signale + MACD). Busy-Layer (EMA 55, FVG, POI, Sessions, Muster, Vol-Profil)
     // sind aus, aber per Toolbar 1 Klick entfernt — verhindert Überladung beim Laden.
-    this.show = { ema21:true, ema55:false, ema200:true, tl:true, sig:true, bot:true, fvg:false, poi:false, sessions:false, volProfile:false, patterns:false, macd:true };
+    this.show = { ema21:true, ema55:false, ema200:true, tl:true, sig:true, bot:true, fvg:false, poi:false, sessions:false, volProfile:false, patterns:false, vol:true, rsi:true, macd:false };
 
     // Crosshair
     this.mX = null; this.mY = null;
@@ -5089,10 +5092,19 @@ class LiveChart {
     const pr  = (this._animLo!=null && this._animHi!=null)
       ? { lo:this._animLo, hi:this._animHi }
       : this._priceRange(vc);
-    const pY0 = this.P_TOP, pH = this.CH*this.PH.price;
-    const vY0 = pY0+pH+1,   vH = this.CH*this.PH.vol;
-    const rY0 = vY0+vH+1,   rH = this.CH*this.PH.rsi;
-    const mY0 = rY0+rH+1,   mH = this.CH*this.PH.macd;
+    // Dynamische Panel-Höhen: ausgeschaltete Oszillatoren geben ihren Platz den
+    // Kerzen → mehr Übersicht. Preis-Panel bekommt den Rest.
+    const oVol  = this.show.vol  ? this.PH.vol  : 0;
+    const oRsi  = this.show.rsi  ? this.PH.rsi  : 0;
+    const oMacd = this.show.macd ? this.PH.macd : 0;
+    const priceR = Math.max(0.45, 1 - oVol - oRsi - oMacd);
+    const pY0 = this.P_TOP, pH = this.CH*priceR;
+    let   _cy = pY0+pH+1;
+    const vY0 = _cy, vH = this.CH*oVol; if (oVol)  _cy += vH+1;
+    const rY0 = _cy, rH = this.CH*oRsi; if (oRsi)  _cy += rH+1;
+    const mY0 = _cy, mH = this.CH*oMacd;
+
+    this._rLabels = [];   // rechte Preis-Labels je Frame entkollidieren
 
     this._drawGrid(pr,pY0,pH);
     if (this.show.sessions) this._drawSessions(pY0,pH);
@@ -5107,8 +5119,8 @@ class LiveChart {
     if (this.show.poi) this._drawPOIs(pr,pY0,pH);
     if (this.show.sig) this._drawSignals(pr,pY0,pH);
     if (this.show.bot) this._drawBotSignals(pr,pY0,pH);
-    this._drawVolume(vY0,vH);
-    this._drawRSI(rY0,rH);
+    if (this.show.vol)  this._drawVolume(vY0,vH);
+    if (this.show.rsi)  this._drawRSI(rY0,rH);
     if (this.show.macd) this._drawMACD(mY0,mH);
     this._drawCurPriceLine(pr,pY0,pH);
     if (this.paperPosition) this._drawOpenPosition(pr,pY0,pH);
@@ -5206,6 +5218,7 @@ class LiveChart {
     const ctx=this.ctx;
     ctx.strokeStyle=this.C.border; ctx.lineWidth=1; ctx.setLineDash([]);
     [[vY0,vH,'VOL'],[rY0,rH,'RSI'],[mY0,mH,'MACD']].forEach(([y,h,lbl])=>{
+      if (h<=0) return;   // ausgeblendetes Panel überspringen
       ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(this.CW,y); ctx.stroke();
       ctx.fillStyle=this.C.textDim; ctx.font='9px Segoe UI'; ctx.textAlign='left';
       ctx.fillText(lbl, 8, y+10);
@@ -5772,31 +5785,11 @@ class LiveChart {
                       : (pos.entry - lastC) * pos.size;
     const upnlCol = upnl >= 0 ? colT : colS;
 
-    // Labels (rechts am Preisskala-Rand)
-    ctx.font      = 'bold 9px Courier New, monospace';
-    ctx.textAlign = 'right';
-
-    // SL-Label
-    const slBox = 14;
-    ctx.fillStyle = colS;
-    ctx.fillRect(x1, slY - slBox/2, this.P_RIGHT, slBox);
-    ctx.fillStyle = '#fff'; ctx.textAlign = 'left';
-    ctx.fillText('SL $'+pos.sl.toFixed(2), x1+4, slY+4);
-
-    // TP-Label
-    ctx.fillStyle = colT;
-    ctx.fillRect(x1, tpY - slBox/2, this.P_RIGHT, slBox);
-    ctx.fillStyle = '#fff';
-    ctx.fillText('TP $'+pos.tp.toFixed(2), x1+4, tpY+4);
-
-    // Entry-Label mit Richtung + uPnL
-    const dir   = isL ? '▲ L' : '▼ S';
+    // Labels rechts — entkollidiert (Entry zuerst = höchste Priorität)
     const upStr = (upnl>=0?'+':'') + upnl.toFixed(2) + '$';
-    const eBoxW = this.P_RIGHT;
-    ctx.fillStyle = isL ? '#089981' : '#f23645';
-    ctx.fillRect(x1, entryY - slBox/2, eBoxW, slBox);
-    ctx.fillStyle = '#fff';
-    ctx.fillText(dir+' '+pos.entry.toFixed(2), x1+4, entryY+4);
+    this._rLabel(entryY, (isL?'▲ ':'▼ ')+pos.entry.toFixed(2), isL?'#089981':'#f23645');
+    this._rLabel(slY, 'SL '+pos.sl.toFixed(2), colS);
+    this._rLabel(tpY, 'TP '+pos.tp.toFixed(2), colT);
 
     // Floating uPnL Badge oben links im Chart
     ctx.textAlign  = 'left';
@@ -5812,6 +5805,26 @@ class LiveChart {
     ctx.fill(); ctx.stroke();
     ctx.fillStyle  = upnl>=0 ? '#089981' : '#f23645';
     ctx.fillText(badge, bx+8, by+15);
+  }
+
+  // Rechtes Preis-Label mit Kollisions-Verschiebung (stapelt statt überlappt).
+  _rLabel(yWant, text, bg, font='bold 10px Courier New, monospace', lh=15) {
+    const ctx=this.ctx, half=lh/2+1;
+    if (!this._rLabels) this._rLabels=[];
+    const hit = yy => this._rLabels.some(r => yy+half > r[0] && yy-half < r[1]);
+    let y = yWant;
+    if (hit(y)) {
+      for (let d=lh+1; d<this.CH; d+=2) {
+        if (!hit(yWant-d)) { y=yWant-d; break; }
+        if (!hit(yWant+d)) { y=yWant+d; break; }
+      }
+    }
+    y = Math.max(this.P_TOP+half, Math.min(this.P_TOP+this.CH-half, y));
+    this._rLabels.push([y-half, y+half]);
+    ctx.fillStyle=bg; ctx.fillRect(this.CW, y-lh/2, this.P_RIGHT, lh);
+    ctx.fillStyle='#fff'; ctx.font=font; ctx.textAlign='left';
+    ctx.fillText(text, this.CW+4, y+3.5);
+    return y;
   }
 
   _drawCurPriceLine(pr,y0,ph) {
@@ -5835,11 +5848,8 @@ class LiveChart {
     ctx.globalAlpha = 1;
     ctx.beginPath(); ctx.arc(dotX, y, 3, 0, Math.PI*2); ctx.fill();
     ctx.restore();
-    // Price label
-    const lh=16;
-    ctx.fillStyle=col; ctx.fillRect(this.CW,y-lh/2,this.P_RIGHT,lh);
-    ctx.fillStyle='#fff'; ctx.font='bold 11px Courier New'; ctx.textAlign='left';
-    ctx.fillText('$'+price.toFixed(2), this.CW+5, y+4);
+    // Live-Preis-Label (höchste Priorität, exakt auf Höhe; andere weichen aus)
+    this._rLabel(y, '$'+price.toFixed(2), col, 'bold 11px Courier New, monospace', 16);
   }
 
   _drawCrosshair(pr,y0,ph,vy0,vh,ry0,rh,my0,mh) {
@@ -5920,6 +5930,37 @@ class LiveChart {
       ctx.fill(); ctx.stroke();
       ctx.fillStyle=this.C.textBright; ctx.textAlign='center';
       ctx.fillText(lbl, lx, this.H-this.P_BOTTOM+14);
+    }
+
+    // ── Floating-Datenfenster am Cursor: OHLC + Δ% der gehoverten Kerze ──
+    const cc = this.candles[ci];
+    if (cc && y>=y0 && y<=y0+ph) {
+      const up2 = cc.c>=cc.o, dcol = up2?this.C.up:this.C.dn;
+      const chg = ((cc.c-cc.o)/cc.o*100);
+      const rows = [
+        ['O', '$'+cc.o.toFixed(2), this.C.textBright],
+        ['H', '$'+cc.h.toFixed(2), this.C.up],
+        ['L', '$'+cc.l.toFixed(2), this.C.dn],
+        ['C', '$'+cc.c.toFixed(2), dcol],
+        ['Δ', (chg>=0?'+':'')+chg.toFixed(2)+'%', dcol],
+      ];
+      const bw=108, bh=rows.length*14+9;
+      let bx = x + 16, by = y - bh - 12;
+      if (bx + bw > this.CW) bx = x - bw - 16;     // an rechter Kante spiegeln
+      if (by < this.P_TOP+2) by = y + 16;
+      bx = Math.max(2, Math.min(this.CW-bw-2, bx));
+      ctx.setLineDash([]);
+      ctx.fillStyle='rgba(11,11,18,0.93)'; ctx.strokeStyle=this.C.border; ctx.lineWidth=1;
+      ctx.beginPath();
+      if(ctx.roundRect) ctx.roundRect(bx,by,bw,bh,5); else ctx.rect(bx,by,bw,bh);
+      ctx.fill(); ctx.stroke();
+      ctx.font='10px Courier New, monospace';
+      rows.forEach((r,i)=>{
+        const ly=by+15+i*14;
+        ctx.fillStyle=this.C.text; ctx.textAlign='left';  ctx.fillText(r[0], bx+9, ly);
+        ctx.fillStyle=r[2];        ctx.textAlign='right'; ctx.fillText(r[1], bx+bw-9, ly);
+      });
+      ctx.textAlign='left';
     }
   }
 
@@ -6248,6 +6289,13 @@ class LiveChart {
         ctx.fillStyle = '#fff'; ctx.fillText((hV >= 0 ? '+' : '') + hV.toFixed(3), this.CW + 3, hy + 4);
       }
     }
+  }
+
+  reset() {
+    // Zurück zum aktuellsten Kerzen-Stand mit Standard-Zoom.
+    this.candleW = 9; this.offsetRight = 8;
+    this._animLo = this._animHi = null;
+    this.render();
   }
 
   zoomIn() {
@@ -7046,6 +7094,8 @@ function lvZoom(dir) {
   if (!lvChart) return;
   if (dir > 0) lvChart.zoomIn(); else lvChart.zoomOut();
 }
+
+function lvReset() { if (lvChart) lvChart.reset(); }
 
 function lvToggleAuto() {
   if(!lvAE) return;
